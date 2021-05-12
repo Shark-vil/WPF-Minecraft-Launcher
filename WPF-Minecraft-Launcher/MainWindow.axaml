@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="WPF_Minecraft_Launcher.MainWindow"
+        Background="#383636"
         Title="WPF_Minecraft_Launcher">
   <Grid Margin="10" ShowGridLines="True">
     <Grid.ColumnDefinitions>
@@ -27,8 +28,8 @@
 
     <TextBox x:Name="TextBox_Logs" Text="{Binding logs}" TextWrapping="Wrap" IsReadOnly="True"
               HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" AcceptsReturn="True"
-              ScrollViewer.VerticalScrollBarVisibility="Auto"
-              Background="Beige" Margin="10, 10, 10, 10" Grid.Row="1" Grid.Column="1"/>
+              ScrollViewer.VerticalScrollBarVisibility="Auto" Background="#667778" SelectionBrush="#667778"
+              Focusable="False" Foreground="White" Margin="10, 10, 10, 10" Grid.Row="1" Grid.Column="1"/>
 
     <StackPanel Grid.Row="2" Grid.Column="1" VerticalAlignment="Stretch">
       <ProgressBar Height="10" Margin="3" Minimum="{Binding fileChangedMin}" 
