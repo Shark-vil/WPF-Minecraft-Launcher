@@ -13,6 +13,8 @@ using System;
 using System.IO;
 using WPF_Minecraft_Launcher.Components;
 using System.Collections.Generic;
+using System.Net.Http;
+using Newtonsoft.Json;
 
 namespace WPF_Minecraft_Launcher
 {
@@ -22,6 +24,8 @@ namespace WPF_Minecraft_Launcher
         internal string processName;
 
         private TextBox TextBox_Logs;
+        private TextBox TextBox_Username;
+        private TextBox TextBox_Password;
         private Button Button_Play;
 
         public MainWindow()
@@ -30,15 +34,14 @@ namespace WPF_Minecraft_Launcher
 
             bool mainThreadRegister = ThreadChecker.IsMainThread;
 
-            var fileManager = new OpenFileDialog();
-            fileManager.AllowMultiple = false;
-
-            Logger.Init();
+            Global.mainWindow = this;
             Global.LauncherConfigInit();
 
             DataContext = content;
 
             TextBox_Logs = this.FindControl<TextBox>("TextBox_Logs");
+            TextBox_Username = this.FindControl<TextBox>("TextBox_Username");
+            TextBox_Password = this.FindControl<TextBox>("TextBox_Password");
             Button_Play = this.FindControl<Button>("Button_Play");
 
 #if DEBUG
@@ -59,11 +62,23 @@ namespace WPF_Minecraft_Launcher
             string dateTime = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss");
             string textFormat = string.Format("[{0}] {1}", dateTime, text);
 
-            content.logs += textFormat + "\n";
+            WebResponseModel? response = null;
 
-//#if DEBUG
-//            Logger.Write(textFormat);
-//#endif
+            try
+            {
+                response = JsonConvert.DeserializeObject<WebResponseModel>(text);
+
+                if (response != null)
+                    textFormat = string.Format("[{0}] {1} - {2}", dateTime, response.code, response.message);
+            }
+            catch { }
+
+#if DEBUG
+            Global.LauncherLogger.Write(textFormat);
+#endif
+
+            int textLenght = textFormat.Length;
+            content.logs += textFormat.Substring(0, (textLenght <= 100 ? textLenght : 100)) + "\n";
 
             if (ThreadChecker.IsMainThread)
                 TextBox_Logs.CaretIndex = int.MaxValue;
@@ -73,22 +88,24 @@ namespace WPF_Minecraft_Launcher
 
         private void OnAuthorizateClick(object sender, RoutedEventArgs e)
         {
-            if (content.username == null || content.username.Length == 0)
-                return;
-
             if (processName != null && Process.GetProcessesByName(processName).Length > 0)
                 return;
 
-            var minecraft = new GameStarter(this);
+            var profile = new Profile(content.username, content.password);
+            var minecraft = new GameStarter(this, profile);
             minecraft.Launch();
         }
 
         internal void switchUiActive(bool active)
         {
             if (ThreadChecker.IsMainThread)
+            {
                 this.Button_Play.IsEnabled = active;
+                this.TextBox_Username.IsEnabled = active;
+                this.TextBox_Password.IsEnabled = active;
+            }
             else
-                Dispatcher.UIThread.InvokeAsync(() => this.Button_Play.IsEnabled = active);
+                Dispatcher.UIThread.InvokeAsync(() => switchUiActive(active));
 
             if (active)
                 resetProgress();
@@ -104,12 +121,7 @@ namespace WPF_Minecraft_Launcher
                     this.Hide();
             }
             else
-            {
-                if (showing)
-                    Dispatcher.UIThread.InvokeAsync(() => this.Show());
-                else
-                    Dispatcher.UIThread.InvokeAsync(() => this.Hide());
-            }
+                Dispatcher.UIThread.InvokeAsync(() => this.switchWindowShow(showing));
         }
 
         internal void resetProgress()
@@ -120,10 +132,7 @@ namespace WPF_Minecraft_Launcher
                 content.progressChangedValue = 0;
             }
             else
-            {
-                Dispatcher.UIThread.InvokeAsync(() => content.fileChangedValue);
-                Dispatcher.UIThread.InvokeAsync(() => content.progressChangedValue = 0);
-            }
+                Dispatcher.UIThread.InvokeAsync(() => resetProgress());
         }
 
         internal void gameCLosed()
