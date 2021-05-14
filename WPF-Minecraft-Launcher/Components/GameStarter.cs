@@ -3,11 +3,13 @@ using CmlLib.Core;
 using CmlLib.Core.Auth;
 using CmlLib.Core.Downloader;
 using CmlLib.Core.Version;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,35 +22,62 @@ namespace WPF_Minecraft_Launcher.Components
         private MainWindow window;
         private MainWindowModel content;
         private Thread gameThread;
-        private Thread processCheckerThread;
         private MSession userMinecraftSession;
         private MinecraftPath minecraftPath;
+        private Profile profile;
+        private MLauncherLogin launcherLogin = new MLauncherLogin();
         internal static GameModel gameModel = new GameModel();
 
-        public GameStarter(MainWindow window)
+        public GameStarter(MainWindow window, Profile profile)
         {
+            this.profile = profile;
             this.window = window;
             this.content = window.content;
         }
 
         internal void Launch()
         {
+            MLoginResponse response = launcherLogin.TryAutoLogin();
+            if (response.Result != MLoginResult.Success)
+            {
+                if (profile.username.Length != 0 && profile.password.Length != 0)
+                    Launch(profile.username, profile.password);
+            }
+            else
+                Launch(response);
+        }
+
+        internal void Launch(string username, string password)
+        {
+            MLoginResponse response = launcherLogin.Authenticate(username, password);
+            Launch(response);
+        }
+
+        internal void Launch(MLoginResponse response)
+        {
             content.fileChangedValue = 0;
             content.progressChangedValue = 0;
 
-            userMinecraftSession = MSession.GetOfflineSession(content.username);
-            minecraftPath = new MinecraftPath(Global.LauncherConfig.MinecraftPath);
+            //userMinecraftSession = MSession.GetOfflineSession(content.username);
 
-            window.switchUiActive(false);
+            if (response.IsSuccess)
+            {
+                userMinecraftSession = response.Session;
+                profile.token = response.Session.AccessToken;
 
-            gameThread = new Thread(OnLaunchMinecraft);
-            gameThread.IsBackground = true;
-            gameThread.Priority = ThreadPriority.Highest;
-            gameThread.Start();
+                minecraftPath = new MinecraftPath(Global.LauncherConfig.MinecraftPath);
 
-            gameModel.minecraftPath = minecraftPath;
-            gameModel.session = userMinecraftSession;
-            gameModel.starterThread = gameThread;
+                window.switchUiActive(false);
+
+                gameThread = new Thread(OnLaunchMinecraft);
+                gameThread.IsBackground = true;
+                gameThread.Priority = ThreadPriority.Highest;
+                gameThread.Start();
+
+                gameModel.minecraftPath = minecraftPath;
+                gameModel.session = userMinecraftSession;
+                gameModel.starterThread = gameThread;
+            }
         }
 
         private void OnLaunchMinecraft()
@@ -60,8 +89,13 @@ namespace WPF_Minecraft_Launcher.Components
                 GameLauncherName = "Minecraft-Client-Pipbuck",
                 VersionType = "Minecraft-Client-Pipbuck",
                 GameLauncherVersion = "1.0.0",
-                ServerIp = "95.216.122.173",
-                ServerPort = 25565,
+                JVMArguments = new string[]
+                {
+                    $"-javaagent:{Global.LauncherConfig.MinecraftPath}"
+                        + "/authlib-injector-1.1.34.jar=" + Global.LauncherConfig.SiteAddress
+                }
+                //ServerIp = "95.216.122.173",
+                //ServerPort = 25565,
             };
 
             var launcher = new CMLauncher(minecraftPath);
@@ -99,13 +133,15 @@ namespace WPF_Minecraft_Launcher.Components
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.RedirectStandardError = true;
             process.StartInfo.ErrorDialog = true;
+            process.EnableRaisingEvents = true;
             process.ErrorDataReceived += Process_ErrorDataReceived;
             process.OutputDataReceived += Process_OutputDataReceived;
+            process.Exited += Process_Exited;
             gameModel.gameProcess = process;
 
             window.AddLineToLog("Starting the game process.");
 
-            Logger.Write(process.StartInfo.Arguments, "PARAMS");
+            Global.LauncherLogger.Write(process.StartInfo.Arguments, "PARAMS");
 
             if (process.Start())
             {
@@ -114,14 +150,11 @@ namespace WPF_Minecraft_Launcher.Components
 
                 window.processName = process.ProcessName;
 
-                processCheckerThread = new Thread(ProcessChecker);
-                processCheckerThread.IsBackground = true;
-                processCheckerThread.Priority = ThreadPriority.Lowest;
-                processCheckerThread.Start();
-
                 window.AddLineToLog("The game watcher process has started.");
 
+#if (!DEBUG)
                 Dispatcher.UIThread.InvokeAsync(() => window.Hide());
+#endif
             }
             else
             {
@@ -132,28 +165,7 @@ namespace WPF_Minecraft_Launcher.Components
             window.resetProgress();
         }
 
-        private void ProcessChecker()
-        {
-            bool isLaunched = false;
-
-            while (true)
-            {
-                int ProcessLength = Process.GetProcessesByName(window.processName).Length;
-
-                if (isLaunched)
-                {
-                    if (ProcessLength == 0)
-                    {
-                        window.gameCLosed();
-                        break;
-                    }
-                }
-                else if (ProcessLength > 0)
-                    isLaunched = true;
-
-                Task.Delay(1000);
-            }
-        }
+        private void Process_Exited(object? sender, EventArgs e) => window.gameCLosed();
 
         private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e)
         {
@@ -162,9 +174,7 @@ namespace WPF_Minecraft_Launcher.Components
             if (data == null)
                 return;
 
-            window.AddLineToLog("System message added to - pipbuck-launcher.log");
-
-            Logger.Write(data);
+            Global.GameLogger.Write(data);
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
@@ -174,9 +184,7 @@ namespace WPF_Minecraft_Launcher.Components
             if (data == null)
                 return;
 
-            window.AddLineToLog("An unexpected error has occurred, check the file - pipbuck-launcher.log");
-
-            Logger.Write(data, "ERROR");
+            Global.GameErrorsLogger.Write(data, "ERROR");
         }
     }
 }
