@@ -19,7 +19,24 @@
       <RowDefinition Height="30"/>
     </Grid.RowDefinitions>
 
- 
+    <Menu Grid.Row="0" Grid.ColumnSpan="3" Background="Gainsboro">
+      <MenuItem Header="Главное">
+        <MenuItem Header="Сайт" ></MenuItem>
+        <MenuItem Header="Установить скин" ></MenuItem>
+        <MenuItem Header="Информация" >
+          <MenuItem Header="О лаунчере"></MenuItem>
+          <MenuItem Header="О версии"></MenuItem>
+        </MenuItem>
+        <Separator />
+        <MenuItem Header="Выход" ></MenuItem>
+      </MenuItem>
+      <MenuItem Header="Настройки" >
+        <MenuItem Header="Конфигурация"></MenuItem>
+        <MenuItem Header="Разработчикам" >
+          <MenuItem Header="Сборка версии"></MenuItem>
+        </MenuItem>
+      </MenuItem>
+    </Menu>
     
     <StackPanel Grid.Row="2" Grid.RowSpan="1" Grid.Column="0" Background="Gray" Margin="5">
       <DockPanel  Margin="5, 10, 5, 0">
