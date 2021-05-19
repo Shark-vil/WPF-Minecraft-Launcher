@@ -23,6 +23,7 @@ namespace WPF_Minecraft_Launcher
         internal MainWindowModel content = new MainWindowModel();
         internal string processName;
 
+        private SettingsWindow settingsWindow;
         private TextBox TextBox_Logs;
         private TextBox TextBox_Username;
         private TextBox TextBox_Password;
@@ -37,12 +38,23 @@ namespace WPF_Minecraft_Launcher
             Global.mainWindow = this;
             Global.LauncherConfigInit();
 
+            if (!Directory.Exists(Global.MinecraftPath))
+                Directory.CreateDirectory(Global.MinecraftPath);
+
+            if (!Directory.Exists(Global.ConfigPath))
+                Directory.CreateDirectory(Global.ConfigPath);
+
+            if (!Directory.Exists(Global.CachePath))
+                Directory.CreateDirectory(Global.CachePath);
+
             DataContext = content;
 
             TextBox_Logs = this.FindControl<TextBox>("TextBox_Logs");
             TextBox_Username = this.FindControl<TextBox>("TextBox_Username");
             TextBox_Password = this.FindControl<TextBox>("TextBox_Password");
             Button_Play = this.FindControl<Button>("Button_Play");
+
+            switchTextBoxActive(false);
 
 #if DEBUG
             this.AttachDevTools();
@@ -77,8 +89,9 @@ namespace WPF_Minecraft_Launcher
             Global.LauncherLogger.Write(textFormat);
 #endif
 
+            int maxLenght = 300;
             int textLenght = textFormat.Length;
-            content.logs += textFormat.Substring(0, (textLenght <= 100 ? textLenght : 100)) + "\n";
+            content.logs += textFormat.Substring(0, (textLenght <= maxLenght ? textLenght : maxLenght)) + "\n";
 
             if (ThreadChecker.IsMainThread)
                 TextBox_Logs.CaretIndex = int.MaxValue;
@@ -91,9 +104,36 @@ namespace WPF_Minecraft_Launcher
             if (processName != null && Process.GetProcessesByName(processName).Length > 0)
                 return;
 
+            content.logs = "";
+
             var profile = new Profile(content.username, content.password);
             var minecraft = new GameStarter(this, profile);
             minecraft.Launch();
+        }
+
+        private void OnOpenSettings(object sender, RoutedEventArgs e)
+        {
+            if (settingsWindow != null)
+                return;
+
+            settingsWindow = new SettingsWindow();
+            settingsWindow.Closed += (object? sender, EventArgs e) => settingsWindow = null;
+            settingsWindow.Show();
+        }
+
+        private void OnOpenSite(object sender, RoutedEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(Global.LauncherConfig.SiteAddress) { UseShellExecute = true });
+        }
+
+        private void OnOpenSkinSite(object sender, RoutedEventArgs e)
+        {
+            Process.Start(new ProcessStartInfo(Global.LauncherConfig.SiteAddress + "/profile/skin") { UseShellExecute = true });
+        }
+
+        private void OnCloseApplication(object sender, RoutedEventArgs e)
+        {
+            this.Close();
         }
 
         internal void switchUiActive(bool active)
@@ -122,6 +162,17 @@ namespace WPF_Minecraft_Launcher
             }
             else
                 Dispatcher.UIThread.InvokeAsync(() => this.switchWindowShow(showing));
+        }
+
+        internal void switchTextBoxActive(bool showing)
+        {
+            if (ThreadChecker.IsMainThread)
+            {
+                this.TextBox_Username.IsEnabled = showing;
+                this.TextBox_Password.IsEnabled = showing;
+            }
+            else
+                Dispatcher.UIThread.InvokeAsync(() => this.switchTextBoxActive(showing));
         }
 
         internal void resetProgress()

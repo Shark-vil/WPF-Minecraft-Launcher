@@ -50,17 +50,18 @@ namespace WPF_Minecraft_Launcher.Components
         public void SetAddress(string WebAddress) => this.WebAddress = WebAddress;
 
         public void AddValue(string key, string value) => SendForm.Add(key, value);
-        
-        public async Task<LWebResponse> Send()
+
+        public LWebResponse Send(HttpMethod method)
         {
             httpRequestMessage = new HttpRequestMessage(SendMethod, WebAddress);
+            httpRequestMessage.Method = method;
 #pragma warning disable CS8620 // Аргумент запрещено использовать для параметра из-за различий в отношении допустимости значений NULL для ссылочных типов.
             httpRequestMessage.Content = new FormUrlEncodedContent(SendForm);
 #pragma warning restore CS8620 // Аргумент запрещено использовать для параметра из-за различий в отношении допустимости значений NULL для ссылочных типов.
             httpRequestMessage.Headers.Add("Accept", "application/json");
             httpRequestMessage.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0");
 
-            HttpResponseMessage httpResponseMessage = await httpClient.SendAsync(httpRequestMessage);
+            HttpResponseMessage httpResponseMessage = httpClient.Send(httpRequestMessage);
 
             return new LWebResponse(httpResponseMessage);
         }

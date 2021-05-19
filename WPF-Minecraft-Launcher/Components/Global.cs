@@ -1,5 +1,7 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,6 +12,11 @@ namespace WPF_Minecraft_Launcher.Components
     public class Global
     {
         internal static LauncherConfigModel LauncherConfig = new LauncherConfigModel();
+        internal static string ApplicationPath = AppContext.BaseDirectory;
+        internal static string MinecraftPath = Path.Combine(ApplicationPath, "minecraft");
+        internal static string ConfigPath = Path.Combine(ApplicationPath, "launcher");
+        internal static string CachePath = Path.Combine(ConfigPath, "cache");
+
         internal static Logger LauncherLogger;
         internal static Logger GameLogger;
         internal static Logger GameErrorsLogger;
@@ -17,21 +24,40 @@ namespace WPF_Minecraft_Launcher.Components
 
         internal static void LauncherConfigInit()
         {
-            LauncherConfig.MinecraftVersion = "1.16.5";
-            LauncherConfig.MinecraftPath = @"F:\MinecraftCustom\client";
             LauncherConfig.LogFileName = "pipbuck-launcher.log";
             LauncherConfig.GameLogFileName = "pipbuck-game-session.log";
             LauncherConfig.GameErrorsLogFileName = "pipbuck-game-errors-session.log";
-            LauncherConfig.SiteAddress = "http://wpf-minecraft-launcher-web.localhost/api/authserver/";
+            LauncherConfig.SiteAddress = "https://mc.pipbuck.ru";
+            LauncherConfig.ServerIP = "95.216.122.173";
+            LauncherConfig.ServerPort = 25565;
+            LauncherConfig.MaxRAM = 4096;
+            LauncherConfig.AuthserverAddress = LauncherConfig.SiteAddress + "/api/authserver/";
+
+            string config_path = Path.Combine(ConfigPath, "config.json");
+            if (File.Exists(config_path))
+            {
+                string config_json = File.ReadAllText(config_path);
+                LauncherConfig = JsonConvert.DeserializeObject<LauncherConfigModel>(config_json);
+            }
+            else
+            {
+                string config_json = JsonConvert.SerializeObject(LauncherConfig, Formatting.Indented);
+                File.WriteAllText(config_path, config_json);
+            }
 
             LauncherLogger = new Logger(LauncherConfig.LogFileName);
             GameLogger = new Logger(LauncherConfig.GameLogFileName);
             GameErrorsLogger = new Logger(LauncherConfig.GameErrorsLogFileName);
         }
 
+        internal static string GetAuthserverApiAddress(string ServiceAddress)
+        {
+            return LauncherConfig.AuthserverAddress + ServiceAddress;
+        }
+
         internal static string GetApiAddress(string ServiceAddress)
         {
-            return LauncherConfig.SiteAddress + ServiceAddress;
+            return LauncherConfig.SiteAddress + "/api/" + ServiceAddress;
         }
     }
 }

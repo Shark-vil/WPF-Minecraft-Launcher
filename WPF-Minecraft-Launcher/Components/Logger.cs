@@ -13,7 +13,7 @@ namespace WPF_Minecraft_Launcher.Components
 
         public Logger(string fileName)
         {
-            string directoryLogPath = Path.Combine(Global.LauncherConfig.MinecraftPath, "launcher");
+            string directoryLogPath = Path.Combine(Global.ConfigPath, "logs");
 
             if (!Directory.Exists(directoryLogPath))
                 Directory.CreateDirectory(directoryLogPath);
@@ -32,12 +32,16 @@ namespace WPF_Minecraft_Launcher.Components
             logtype = logtype.ToUpper();
             string dateTime = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss");
 
-            using (var f = new StreamWriter(filePath, true))
+            try
             {
-                f.WriteLine(string.Format("[{0}][{1}] {2}", dateTime, logtype, text));
-                f.Flush();
-                f.Close();
+                using (var f = new StreamWriter(filePath, true))
+                {
+                    f.WriteLine(string.Format("[{0}][{1}] {2}", dateTime, logtype, text));
+                    f.Flush();
+                    f.Close();
+                }
             }
+            catch(IOException ex) { }
         }
     }
 }

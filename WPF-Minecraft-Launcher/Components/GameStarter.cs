@@ -9,7 +9,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
+using System.Net.Security;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -37,9 +40,13 @@ namespace WPF_Minecraft_Launcher.Components
 
         internal void Launch()
         {
+            Global.mainWindow.switchUiActive(false);
+
             MLoginResponse response = launcherLogin.TryAutoLogin();
             if (response.Result != MLoginResult.Success)
             {
+                Global.mainWindow.switchUiActive(true);
+
                 if (profile.username.Length != 0 && profile.password.Length != 0)
                     Launch(profile.username, profile.password);
             }
@@ -62,12 +69,12 @@ namespace WPF_Minecraft_Launcher.Components
 
             if (response.IsSuccess)
             {
+                Global.mainWindow.switchUiActive(false);
+
                 userMinecraftSession = response.Session;
                 profile.token = response.Session.AccessToken;
 
-                minecraftPath = new MinecraftPath(Global.LauncherConfig.MinecraftPath);
-
-                window.switchUiActive(false);
+                minecraftPath = new MinecraftPath(Global.MinecraftPath);
 
                 gameThread = new Thread(OnLaunchMinecraft);
                 gameThread.IsBackground = true;
@@ -78,24 +85,68 @@ namespace WPF_Minecraft_Launcher.Components
                 gameModel.session = userMinecraftSession;
                 gameModel.starterThread = gameThread;
             }
+            else
+                Global.mainWindow.switchUiActive(true);
         }
 
         private void OnLaunchMinecraft()
         {
+            var javaDownloader = new JavaRuntimeDownloader();
+            var addonsDownloader = new AddonsDownloader();
+            var minecraftDownloader = new MinecraftVersionDownloader();
+            string javapath = "";
+
+            javaDownloader.ProgressChanged += (s, e) =>
+            {
+                content.progressChangedMin = 0;
+                content.progressChangedMax = 100;
+                content.progressChangedValue = e.ProgressPercentage;
+            };
+            javaDownloader.DownloadCompleted = (string _javapath) =>
+            {
+                javapath = _javapath;
+                minecraftDownloader.Download();
+            };
+
+            minecraftDownloader.ProgressChanged += (s, e) =>
+            {
+                content.progressChangedMin = 0;
+                content.progressChangedMax = 100;
+                content.progressChangedValue = e.ProgressPercentage;
+            };
+            minecraftDownloader.DownloadCompleted = (string minecraft_version) => Launcher_Start(javapath, minecraft_version);
+
+            addonsDownloader.ProgressChanged += (s, e) =>
+            {
+                content.progressChangedMin = 0;
+                content.progressChangedMax = 100;
+                content.progressChangedValue = e.ProgressPercentage;
+            };
+            addonsDownloader.DownloadCompleted = () => javaDownloader.CheckJava();
+
+            addonsDownloader.Download();
+        }
+
+        private void Launcher_Start(string javapath, string minecraft_version)
+        {
+            string authlib_path = Path.Combine(Global.MinecraftPath, "authlib.jar");
+            if (!File.Exists(authlib_path))
+                File.WriteAllBytes(authlib_path, Properties.Resources.authlib);
+
             var launchOption = new MLaunchOption
             {
-                MaximumRamMb = 1024,
+                MaximumRamMb = Global.LauncherConfig.MaxRAM,
                 Session = userMinecraftSession,
                 GameLauncherName = "Minecraft-Client-Pipbuck",
                 VersionType = "Minecraft-Client-Pipbuck",
                 GameLauncherVersion = "1.0.0",
+                JavaPath = javapath,
                 JVMArguments = new string[]
                 {
-                    $"-javaagent:{Global.LauncherConfig.MinecraftPath}"
-                        + "/authlib-injector-1.1.34.jar=" + Global.LauncherConfig.SiteAddress
-                }
-                //ServerIp = "95.216.122.173",
-                //ServerPort = 25565,
+                    $"-Dauthlibinjector.noLogFile -javaagent:{authlib_path}=" + Global.LauncherConfig.AuthserverAddress
+                },
+                ServerIp = (Global.LauncherConfig.ServerIP.Length != 0) ? Global.LauncherConfig.ServerIP : null,
+                ServerPort = Global.LauncherConfig.ServerPort,
             };
 
             var launcher = new CMLauncher(minecraftPath);
@@ -128,7 +179,12 @@ namespace WPF_Minecraft_Launcher.Components
 
             launcher.LogOutput += (s, e) => window.AddLineToLog(e);
 
-            var process = launcher.CreateProcess(Global.LauncherConfig.MinecraftVersion, launchOption);
+            Process process = launcher.CreateProcess(minecraft_version, launchOption);
+            Process_Start(process);
+        }
+
+        private void Process_Start(Process process)
+        {
             process.StartInfo.UseShellExecute = false;
             process.StartInfo.RedirectStandardOutput = true;
             process.StartInfo.RedirectStandardError = true;

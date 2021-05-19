@@ -13,7 +13,7 @@ namespace WPF_Minecraft_Launcher.Components
     public class MLauncherLogin
     {
 
-        public static readonly string DefaultLoginSessionFile = Path.Combine(Global.LauncherConfig.MinecraftPath, ".tokencache");
+        public static readonly string DefaultLoginSessionFile = Path.Combine(Global.ConfigPath, "authorization.dat");
 
         public MLauncherLogin() : this(DefaultLoginSessionFile) { }
 
@@ -43,25 +43,18 @@ namespace WPF_Minecraft_Launcher.Components
 
         private void WriteSessionCache(MSession session)
         {
-            if (!SaveSession) return;
-            Directory.CreateDirectory(Path.GetDirectoryName(SessionCacheFilePath));
+            if (!SaveSession) 
+                return;
 
             var json = JsonConvert.SerializeObject(session);
-
-            if (File.Exists(SessionCacheFilePath))
-                File.SetAttributes(SessionCacheFilePath, FileAttributes.Normal);
-
-            File.WriteAllText(SessionCacheFilePath, Helpers.Base64Encode(json), Encoding.UTF8);
-            File.SetAttributes(SessionCacheFilePath, FileAttributes.Hidden);
+            File.WriteAllText(SessionCacheFilePath, json, Encoding.UTF8);
         }
 
         public MSession ReadSessionCache()
         {
             if (File.Exists(SessionCacheFilePath))
             {
-                File.SetAttributes(SessionCacheFilePath, FileAttributes.Normal);
-                string filedata = Helpers.Base64Decode(File.ReadAllText(SessionCacheFilePath, Encoding.UTF8));
-                File.SetAttributes(SessionCacheFilePath, FileAttributes.Hidden);
+                string filedata = File.ReadAllText(SessionCacheFilePath, Encoding.UTF8);
 
                 try
                 {
@@ -88,7 +81,7 @@ namespace WPF_Minecraft_Launcher.Components
 
         private HttpWebResponse mojangRequest(string endpoint, string postdata)
         {
-            var http = WebRequest.CreateHttp(Global.GetApiAddress(endpoint));
+            var http = WebRequest.CreateHttp(Global.GetAuthserverApiAddress(endpoint));
             http.ContentType = "application/json";
             http.Method = "POST";
             using (var req = new StreamWriter(http.GetRequestStream()))
