@@ -7,7 +7,7 @@
         WindowStartupLocation="CenterScreen"
         Background="#383636"
         Title="Launcher - Main">
-  <Grid Margin="10" ShowGridLines="True">
+  <Grid x:Name="Grid_Container" Margin="10" ShowGridLines="True">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="220" />
       <ColumnDefinition Width="1.5*" MinWidth="300"/>

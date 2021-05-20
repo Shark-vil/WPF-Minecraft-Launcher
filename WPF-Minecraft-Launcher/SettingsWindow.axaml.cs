@@ -21,6 +21,8 @@ namespace WPF_Minecraft_Launcher
 
 #if DEBUG
             this.AttachDevTools();
+#else
+            this.FindControl<Grid>("Grid_Container").ShowGridLines = false;
 #endif
         }
 
