@@ -93,8 +93,6 @@ namespace WPF_Minecraft_Launcher.Components
         {
             var javaDownloader = new JavaRuntimeDownloader();
             var addonsDownloader = new AddonsDownloader();
-            var minecraftDownloader = new MinecraftVersionDownloader();
-            string javapath = "";
 
             javaDownloader.ProgressChanged += (s, e) =>
             {
@@ -102,19 +100,7 @@ namespace WPF_Minecraft_Launcher.Components
                 content.progressChangedMax = 100;
                 content.progressChangedValue = e.ProgressPercentage;
             };
-            javaDownloader.DownloadCompleted = (string _javapath) =>
-            {
-                javapath = _javapath;
-                minecraftDownloader.Download();
-            };
-
-            minecraftDownloader.ProgressChanged += (s, e) =>
-            {
-                content.progressChangedMin = 0;
-                content.progressChangedMax = 100;
-                content.progressChangedValue = e.ProgressPercentage;
-            };
-            minecraftDownloader.DownloadCompleted = (string minecraft_version) => Launcher_Start(javapath, minecraft_version);
+            javaDownloader.DownloadCompleted = (string javapath) => Launcher_Start(javapath);
 
             addonsDownloader.ProgressChanged += (s, e) =>
             {
@@ -127,8 +113,16 @@ namespace WPF_Minecraft_Launcher.Components
             addonsDownloader.Download();
         }
 
-        private void Launcher_Start(string javapath, string minecraft_version)
+        private void Launcher_Start(string javapath)
         {
+            MinecraftVersionModel version = MinecraftVersion.GetVersion();
+            if (version == null)
+            {
+                window.AddLineToLog("Failed to get the latest version.");
+                window.switchUiActive(true);
+                return;
+            }
+
             string authlib_path = Path.Combine(Global.MinecraftPath, "authlib.jar");
             if (!File.Exists(authlib_path))
                 File.WriteAllBytes(authlib_path, Properties.Resources.authlib);
@@ -179,8 +173,27 @@ namespace WPF_Minecraft_Launcher.Components
 
             launcher.LogOutput += (s, e) => window.AddLineToLog(e);
 
-            Process process = launcher.CreateProcess(minecraft_version, launchOption);
-            Process_Start(process);
+            Process process;
+
+            string minecraft_version = version.response.minecraft_version;
+            string forge_version = version.response.forge_version;
+
+            if (minecraft_version.Length != 0)
+            {
+                window.AddLineToLog("The launcher will download the required packages, please wait.");
+
+                if (forge_version.Length != 0)
+                    process = launcher.CreateProcess(minecraft_version, forge_version, launchOption);
+                else
+                    process = launcher.CreateProcess(minecraft_version, launchOption);
+
+                Process_Start(process);
+            }
+            else
+            {
+                window.AddLineToLog("Error. Invalid version information, empty string.");
+                window.switchUiActive(true);
+            }
         }
 
         private void Process_Start(Process process)
