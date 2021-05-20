@@ -53,11 +53,16 @@
               Focusable="False" Foreground="White" Margin="10, 10, 10, 10" Grid.Row="2" Grid.Column="1" FontSize="12"/>
 
     <StackPanel Grid.Row="4" Grid.Column="1" VerticalAlignment="Stretch">
-      <ProgressBar Height="10" Margin="3" Minimum="{Binding fileChangedMin}" 
+      <Grid>
+        <ProgressBar Height="10" Margin="3" Minimum="{Binding fileChangedMin}"
                    Maximum="{Binding fileChangedMax}" Value="{Binding fileChangedValue}"/>
-      
-      <ProgressBar Height="10" Margin="3" Minimum="{Binding progressChangedMin}" 
-                   Maximum="{Binding progressChangedMax}" Value="{Binding progressChangedValue}"/>
+        <TextBlock Text="{Binding fileChangedText}" Foreground="White" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
+      <Grid>
+        <ProgressBar Height="10" Margin="3" Minimum="{Binding progressChangedMin}" 
+                     Maximum="{Binding progressChangedMax}" Value="{Binding progressChangedValue}"/>
+        <TextBlock Text="{Binding progressChangedText}" Foreground="White" FontSize="8" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+      </Grid>
     </StackPanel>
     
   </Grid>

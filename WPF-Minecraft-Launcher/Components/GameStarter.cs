@@ -99,6 +99,7 @@ namespace WPF_Minecraft_Launcher.Components
                 content.progressChangedMin = 0;
                 content.progressChangedMax = 100;
                 content.progressChangedValue = e.ProgressPercentage;
+                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
             };
             javaDownloader.DownloadCompleted = (string javapath) => Launcher_Start(javapath);
 
@@ -107,6 +108,7 @@ namespace WPF_Minecraft_Launcher.Components
                 content.progressChangedMin = 0;
                 content.progressChangedMax = 100;
                 content.progressChangedValue = e.ProgressPercentage;
+                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
             };
             addonsDownloader.DownloadCompleted = () => javaDownloader.CheckJava();
 
@@ -162,6 +164,8 @@ namespace WPF_Minecraft_Launcher.Components
 
                 if (ProgressedFileCount == TotalFileCount)
                     window.AddLineToLog(text);
+
+                content.fileChangedText = text;
             };
 
             launcher.ProgressChanged += (s, e) =>
@@ -169,9 +173,10 @@ namespace WPF_Minecraft_Launcher.Components
                 content.progressChangedMin = 0;
                 content.progressChangedMax = 100;
                 content.progressChangedValue = e.ProgressPercentage;
+                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
             };
 
-            launcher.LogOutput += (s, e) => window.AddLineToLog(e);
+            launcher.LogOutput += (s, e) => Global.LauncherLogger.Write(e);
 
             Process process;
 
@@ -218,8 +223,6 @@ namespace WPF_Minecraft_Launcher.Components
                 process.BeginOutputReadLine();
 
                 window.processName = process.ProcessName;
-
-                window.AddLineToLog("The game watcher process has started.");
 
 #if (!DEBUG)
                 Dispatcher.UIThread.InvokeAsync(() => window.Hide());

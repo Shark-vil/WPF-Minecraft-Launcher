@@ -17,10 +17,12 @@ namespace WPF_Minecraft_Launcher.Models
         private int _fileChangedMin = 0;
         private int _fileChangedMax = 100;
         private int _fileChangedValue = 0;
+        private string _fileChangedText = "";
         private bool _fileIsLoop = false;
         private int _progressChangedMin = 0;
         private int _progressChangedMax = 100;
         private int _progressChangedValue = 0;
+        private string _progressChangedText = "";
 
         internal string username
         {
@@ -82,6 +84,16 @@ namespace WPF_Minecraft_Launcher.Models
             }
         }
 
+        internal string fileChangedText
+        {
+            get { return _fileChangedText; }
+            set
+            {
+                _fileChangedText = value;
+                OnPropertyChanged();
+            }
+        }
+
         internal bool fileIsLoop
         {
             get { return _fileIsLoop; }
@@ -118,6 +130,16 @@ namespace WPF_Minecraft_Launcher.Models
             set
             {
                 _progressChangedValue = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal string progressChangedText
+        {
+            get { return _progressChangedText; }
+            set
+            {
+                _progressChangedText = value;
                 OnPropertyChanged();
             }
         }
