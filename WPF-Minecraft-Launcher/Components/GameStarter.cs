@@ -78,7 +78,7 @@ namespace WPF_Minecraft_Launcher.Components
 
                 gameThread = new Thread(OnLaunchMinecraft);
                 gameThread.IsBackground = true;
-                gameThread.Priority = ThreadPriority.Highest;
+                gameThread.Priority = ThreadPriority.Normal;
                 gameThread.Start();
 
                 gameModel.minecraftPath = minecraftPath;
