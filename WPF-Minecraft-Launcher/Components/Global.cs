@@ -24,6 +24,15 @@ namespace WPF_Minecraft_Launcher.Components
 
         internal static void LauncherConfigInit()
         {
+            if (!Directory.Exists(MinecraftPath))
+                Directory.CreateDirectory(MinecraftPath);
+
+            if (!Directory.Exists(ConfigPath))
+                Directory.CreateDirectory(ConfigPath);
+
+            if (!Directory.Exists(CachePath))
+                Directory.CreateDirectory(CachePath);
+
             LauncherConfig.LogFileName = "pipbuck-launcher.log";
             LauncherConfig.GameLogFileName = "pipbuck-game-session.log";
             LauncherConfig.GameErrorsLogFileName = "pipbuck-game-errors-session.log";
