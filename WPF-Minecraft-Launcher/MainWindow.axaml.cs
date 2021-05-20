@@ -38,15 +38,6 @@ namespace WPF_Minecraft_Launcher
             Global.mainWindow = this;
             Global.LauncherConfigInit();
 
-            if (!Directory.Exists(Global.MinecraftPath))
-                Directory.CreateDirectory(Global.MinecraftPath);
-
-            if (!Directory.Exists(Global.ConfigPath))
-                Directory.CreateDirectory(Global.ConfigPath);
-
-            if (!Directory.Exists(Global.CachePath))
-                Directory.CreateDirectory(Global.CachePath);
-
             DataContext = content;
 
             TextBox_Logs = this.FindControl<TextBox>("TextBox_Logs");
