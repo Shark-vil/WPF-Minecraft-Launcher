@@ -45,7 +45,8 @@ namespace WPF_Minecraft_Launcher
             TextBox_Password = this.FindControl<TextBox>("TextBox_Password");
             Button_Play = this.FindControl<Button>("Button_Play");
 
-            switchTextBoxActive(false);
+            if (File.Exists(Path.Combine(Global.ConfigPath, "authorization.dat")))
+                switchTextBoxActive(false);
 
 #if DEBUG
             this.AttachDevTools();
