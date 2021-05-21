@@ -142,6 +142,7 @@ namespace WPF_Minecraft_Launcher.Components
                 JVMArguments = new string[]
                 {
                     $"-javaagent:{authlib_path}=" + Global.LauncherConfig.AuthserverAddress,
+                    "-Dauthlibinjector.debug",
                     "-Dauthlibinjector.noLogFile",
                     $"-Xms{MinimumRAM}m",
                     $"-Xmx{MaximumRAM}m"
