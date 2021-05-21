@@ -129,9 +129,11 @@ namespace WPF_Minecraft_Launcher.Components
             if (!File.Exists(authlib_path))
                 File.WriteAllBytes(authlib_path, Properties.Resources.authlib);
 
+            int MinimumRAM = 2048;
+            int MaximumRAM = Global.LauncherConfig.MaxRAM < MinimumRAM ? MinimumRAM : Global.LauncherConfig.MaxRAM;
+
             var launchOption = new MLaunchOption
             {
-                MaximumRamMb = Global.LauncherConfig.MaxRAM,
                 Session = userMinecraftSession,
                 GameLauncherName = "Minecraft-Client-Pipbuck",
                 VersionType = "Minecraft-Client-Pipbuck",
@@ -139,7 +141,10 @@ namespace WPF_Minecraft_Launcher.Components
                 JavaPath = javapath,
                 JVMArguments = new string[]
                 {
-                    $"-Dauthlibinjector.noLogFile -javaagent:{authlib_path}=" + Global.LauncherConfig.AuthserverAddress
+                    $"-javaagent:{authlib_path}=" + Global.LauncherConfig.AuthserverAddress,
+                    "-Dauthlibinjector.noLogFile",
+                    $"-Xms{MinimumRAM}m",
+                    $"-Xmx{MaximumRAM}m"
                 },
                 ServerIp = (Global.LauncherConfig.ServerIP.Length != 0) ? Global.LauncherConfig.ServerIP : null,
                 ServerPort = Global.LauncherConfig.ServerPort,
