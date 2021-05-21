@@ -112,7 +112,7 @@ namespace WPF_Minecraft_Launcher.Components
             };
             addonsDownloader.DownloadCompleted = () => javaDownloader.CheckJava();
 
-            addonsDownloader.Download();
+            Task.Run(() => addonsDownloader.Download());
         }
 
         private void Launcher_Start(string javapath)

@@ -54,7 +54,7 @@ namespace WPF_Minecraft_Launcher.Components
             }
         }
 
-        public void Download()
+        public async void Download()
         {
             try
             {
@@ -153,7 +153,7 @@ namespace WPF_Minecraft_Launcher.Components
                                     RecalculateProgress(ref current_progress, total_ptrogress);
                                 });
 
-                                client.DownloadFileAsync(new Uri(addon.link), zipFilePath);
+                                await client.DownloadFileTaskAsync(new Uri(addon.link), zipFilePath);
                             }
                         }
                     }
