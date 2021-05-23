@@ -1,115 +1,107 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
 using CmlLib.Utils;
 using System.ComponentModel;
 using CmlLib.Core;
-using ICSharpCode.SharpZipLib.Zip;
-using System.Security.Cryptography;
-using System.Threading;
-using ICSharpCode.SharpZipLib.Core;
 
 namespace WPF_Minecraft_Launcher.Components
 {
     public class JavaRuntimeDownloader
     {
-        public event ProgressChangedEventHandler ProgressChanged;
-        public Action<string> DownloadCompleted;
-        public string runtime_directory = "";
-        public string javapath = "";
-        public string hash_cache_path = "";
+        public event ProgressChangedEventHandler? ProgressChanged;
+        public Action<string>? DownloadCompleted;
+        public string JavaRuntimeDirectoryPath = "";
+        public string JavaRuntimeFilePath = "";
+        public string JavaVersionCacheHashPath = "";
 
         public JavaRuntimeDownloader()
         {
-            runtime_directory = Path.Combine(Global.MinecraftPath, "runtime");
-            hash_cache_path = Path.Combine(Global.ConfigPath, "javaversionhash.dat");
+            JavaRuntimeDirectoryPath = Path.Combine(Global.MinecraftPath, "runtime");
+            JavaVersionCacheHashPath = Path.Combine(Global.ConfigPath, "javaversionhash.dat");
         }
 
         public void CheckJava()
         {
-            var binaryName = "java";
+            var BinaryName = "java";
             if (MRule.OSName == MRule.Windows)
-                binaryName = "javaw.exe";
+                BinaryName = "javaw.exe";
 
-            CheckJava(binaryName);
+            CheckJava(BinaryName);
         }
 
-        public void CheckJava(string binaryName)
+        public void CheckJava(string BinaryName)
         {
-            javapath = Path.Combine(runtime_directory, "bin", binaryName);
+            JavaRuntimeFilePath = Path.Combine(JavaRuntimeDirectoryPath, "bin", BinaryName);
 
             try
             {
-                string get_version_url = Global.GetApiAddress("javaversion/get_actual");
-                ActualVersionModel actual_version = null;
+                string GetActualJavaVersionURL = Global.GetApiAddress("javaversion/get_actual");
+                ActualVersionModel ActualVersion = null;
 
-                using (var wc = new WebClient())
+                using (var client = new WebClient())
                 {
-                    string json = wc.DownloadString(get_version_url);
-                    actual_version = JsonConvert.DeserializeObject<ActualVersionModel>(json);
+                    string ActualVersionJsonText = client.DownloadString(GetActualJavaVersionURL);
+                    ActualVersion = JsonConvert.DeserializeObject<ActualVersionModel>(ActualVersionJsonText);
                 }
 
-                if (actual_version == null)
+                if (ActualVersion == null)
                     throw new Exception("Failed to get the latest version of java.");
 
-                if (File.Exists(hash_cache_path) && File.Exists(javapath))
+                if (File.Exists(JavaVersionCacheHashPath) && File.Exists(JavaRuntimeFilePath))
                 {
-                    string old_hash = File.ReadAllText(hash_cache_path);
-                    if (old_hash == actual_version.response.hash)
+                    string SavedJavaVersionHash = File.ReadAllText(JavaVersionCacheHashPath);
+                    if (SavedJavaVersionHash == ActualVersion.response.hash)
                     {
-                        DownloadCompleted.Invoke(javapath);
+                        DownloadCompleted.Invoke(JavaRuntimeFilePath);
                         return;
                     }
                 }
 
-                string saved_path = Path.Combine(Global.CachePath, actual_version.response.tag);
+                string DownloadVersionCachePath = Path.Combine(Global.CachePath, ActualVersion.response.tag);
 
-                if (File.Exists(saved_path))
-                    File.Delete(saved_path);
+                if (File.Exists(DownloadVersionCachePath))
+                    File.Delete(DownloadVersionCachePath);
 
-                if (!Directory.Exists(runtime_directory))
-                    Directory.CreateDirectory(runtime_directory);
+                if (!Directory.Exists(JavaRuntimeDirectoryPath))
+                    Directory.CreateDirectory(JavaRuntimeDirectoryPath);
 
-                DirectoryInfo di = new DirectoryInfo(runtime_directory);
+                DirectoryInfo RuntimeDirectoryInfo = new DirectoryInfo(JavaRuntimeDirectoryPath);
 
-                foreach (FileInfo file in di.GetFiles())
+                foreach (FileInfo file in RuntimeDirectoryInfo.GetFiles())
                     file.Delete();
 
-                foreach (DirectoryInfo dir in di.GetDirectories())
-                    dir.Delete(true);
+                foreach (DirectoryInfo directory in RuntimeDirectoryInfo.GetDirectories())
+                    directory.Delete(true);
 
                 using (var client = new WebClient())
                 {
-                    Global.mainWindow.AddLineToLog(actual_version.response.link);
+                    Global.MainWindowUI.WriteTextToLogBox(ActualVersion.response.link);
 
                     client.DownloadProgressChanged += DownloadVersion_DownloadProgressChanged;
                     client.DownloadFileCompleted += new AsyncCompletedEventHandler((object sender, AsyncCompletedEventArgs e) =>
                     {
-                        var z = new SharpZip(saved_path);
-                        z.ProgressEvent += Z_ProgressEvent;
-                        z.Unzip(runtime_directory);
+                        var z = new SharpZip(DownloadVersionCachePath);
+                        z.ProgressEvent += UnzipProgressEvent;
+                        z.Unzip(JavaRuntimeDirectoryPath);
 
-                        if (!File.Exists(javapath))
+                        if (!File.Exists(JavaRuntimeFilePath))
                             throw new Exception("Failed Download");
 
                         if (MRule.OSName != MRule.Windows)
-                            IOUtil.Chmod(javapath, IOUtil.Chmod755);
+                            IOUtil.Chmod(JavaRuntimeFilePath, IOUtil.Chmod755);
 
-                        File.WriteAllText(hash_cache_path, actual_version.response.hash);
+                        File.WriteAllText(JavaVersionCacheHashPath, ActualVersion.response.hash);
 
-                        if (File.Exists(saved_path))
-                            File.Delete(saved_path);
+                        if (File.Exists(DownloadVersionCachePath))
+                            File.Delete(DownloadVersionCachePath);
 
-                        DownloadCompleted.Invoke(javapath);
+                        DownloadCompleted.Invoke(JavaRuntimeFilePath);
                     });
 
-                    client.DownloadFileAsync(new Uri(actual_version.response.link), saved_path);
+                    client.DownloadFileAsync(new Uri(ActualVersion.response.link), DownloadVersionCachePath);
                 }
             }
             catch(Exception ex)
@@ -119,7 +111,7 @@ namespace WPF_Minecraft_Launcher.Components
             }
         }
 
-        private void Z_ProgressEvent(object sender, int e)
+        private void UnzipProgressEvent(object sender, int e)
         {
             ProgressChanged?.Invoke(this, new ProgressChangedEventArgs(e, null));
         }

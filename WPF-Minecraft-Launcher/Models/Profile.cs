@@ -8,15 +8,15 @@ namespace WPF_Minecraft_Launcher.Models
 {
     public class Profile
     {
-        internal string username;
-        internal string password;
-        internal string token;
+        internal string UserName;
+        internal string UserPassword;
+        internal string AccessToken;
 
         public Profile(string username = "", string password = "", string token = "")
         {
-            this.username = username;
-            this.password = password;
-            this.token = token;
+            this.UserName = username;
+            this.UserPassword = password;
+            this.AccessToken = token;
         }
     }
 }

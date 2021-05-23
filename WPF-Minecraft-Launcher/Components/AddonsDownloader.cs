@@ -7,47 +7,43 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
 
 namespace WPF_Minecraft_Launcher.Components
 {
     public class AddonsDownloader
     {
-        public event ProgressChangedEventHandler ProgressChanged;
-        public Action DownloadCompleted;
+        public event ProgressChangedEventHandler? ProgressChanged;
+        public Action? DownloadCompleted;
 
-        private string get_addons_address;
-        private string get_removed_addons_address;
-        private string cache_path;
-        private string mods_path;
-        private string[] find_mods;
-        private Dictionary<string, string> find_mods_and_hashes;
-        private List<string> cache_hashes = new List<string>();
+        private string GetAddonsURL;
+        private string AddonsCachePath;
+        private string MinecraftModsPath;
+        private string[] FindJarMods;
+        private Dictionary<string, string> ModsAndHashesExists;
+        private List<string> AddonsCacheHashesList = new List<string>();
 
         public AddonsDownloader()
         {
-            get_addons_address = Global.GetApiAddress("addon/get");
-            get_removed_addons_address = Global.GetApiAddress("addon/get_del");
-            cache_path = Path.Combine(Global.ConfigPath, "addons.json");
-            mods_path = Path.Combine(Global.MinecraftPath, "mods");
+            GetAddonsURL = Global.GetApiAddress("addon/get");
+            AddonsCachePath = Path.Combine(Global.ConfigPath, "addons.json");
+            MinecraftModsPath = Path.Combine(Global.MinecraftPath, "mods");
 
-            if (!Directory.Exists(mods_path))
-                Directory.CreateDirectory(mods_path);
+            if (!Directory.Exists(MinecraftModsPath))
+                Directory.CreateDirectory(MinecraftModsPath);
 
-            find_mods = Directory.GetFiles(mods_path, "*.jar");
-            find_mods_and_hashes = new Dictionary<string, string>();
+            FindJarMods = Directory.GetFiles(MinecraftModsPath, "*.jar");
+            ModsAndHashesExists = new Dictionary<string, string>();
 
-            if (File.Exists(cache_path))
+            if (File.Exists(AddonsCachePath))
             {
-                using (var reader = new StreamReader(cache_path))
+                using (var reader = new StreamReader(AddonsCachePath))
                 {
-                    string text = reader.ReadToEnd();
-                    List<string> read_cache_hashes = JsonConvert.DeserializeObject<List<string>>(text);
+                    string AddonsHashesJsonText = reader.ReadToEnd();
+                    var HashesList = JsonConvert.DeserializeObject<List<string>>(AddonsHashesJsonText);
 
-                    if (read_cache_hashes != null)
-                        cache_hashes = read_cache_hashes;
+                    if (HashesList != null)
+                        AddonsCacheHashesList = HashesList;
 
                     reader.Close();
                 }
@@ -58,80 +54,93 @@ namespace WPF_Minecraft_Launcher.Components
         {
             try
             {
-                foreach(string fileName in find_mods)
+                foreach(string FileName in FindJarMods)
                 {
-                    string full_path = Path.Combine(mods_path, fileName);
-                    string hash = Helpers.CalculateFileMD5(full_path);
-                    find_mods_and_hashes.Add(hash, full_path);
+                    string FullFilePath = Path.Combine(MinecraftModsPath, FileName);
+                    string FileHash = Helpers.CalculateFileMD5(FullFilePath);
+                    ModsAndHashesExists.Add(FileHash, FullFilePath);
                 }
 
-                Global.mainWindow.AddLineToLog($"Start addons downloading");
+                Global.MainWindowUI.WriteTextToLogBox($"Start addons downloading");
 
-                AddonModel addons;
-                DelAddonModel removed_addon;
-                string json_addons = "";
-                string json_removed_addons = "";
+                var GetAddonsReqeust = new LWebRequest();
+                GetAddonsReqeust.SetAddress(GetAddonsURL);
 
-                var requestGetAddons = new LWebRequest();
-                requestGetAddons.SetAddress(get_addons_address);
-                json_addons = requestGetAddons.Send(HttpMethod.Get).htmlTextMessage;
+                string JsonAddonsResponse = GetAddonsReqeust.Send(HttpMethod.Get).ResponseText;
+                var AddonsResponse = JsonConvert.DeserializeObject<AddonModel>(JsonAddonsResponse);
 
-                var requestGetRemovedAddons = new LWebRequest();
-                requestGetRemovedAddons.SetAddress(get_removed_addons_address);
-                json_removed_addons = requestGetRemovedAddons.Send(HttpMethod.Get).htmlTextMessage;
-
-                addons = JsonConvert.DeserializeObject<AddonModel>(json_addons);
-                removed_addon = JsonConvert.DeserializeObject<DelAddonModel>(json_removed_addons);
-
-                if (removed_addon != null)
+                if (AddonsResponse == null || AddonsResponse.response.Count == 0)
                 {
-                    List<DelAddonResponseModel> response = removed_addon.response;
-                    int total_ptrogress = response.Count;
-                    int current_progress = 0;
-
-                    foreach (DelAddonResponseModel addon in response)
+                    foreach(string FileHash in AddonsCacheHashesList)
                     {
-                        string hash = addon.hash;
-                        if (cache_hashes.Exists(x => x == hash))
+                        string FilePath = ModsAndHashesExists.FirstOrDefault(x => x.Key == FileHash).Value;
+                        if (FilePath != null)
                         {
-                            string path = find_mods_and_hashes.FirstOrDefault(x => x.Key == hash).Value;
-                            if (path != null && path.Length != 0)
-                            {
-                                File.Delete(path);
-                                cache_hashes.RemoveAll(x => x == hash);
+                            if (File.Exists(FilePath))
+                                File.Delete(FilePath);
 
-                                Global.mainWindow.AddLineToLog($"Remove addon - {addon.name}");
-                            }
+                            AddonsCacheHashesList.RemoveAll(x => x == FileHash);
+                            Global.MainWindowUI.WriteTextToLogBox($"Remove addon - {Path.GetFileName(FilePath)}");
                         }
-
-                        current_progress++;
-
-                        int result = (current_progress / total_ptrogress) * 100;
-                        DownloadVersion_DownloadProgressChanged(null, new ProgressChangedEventArgs(result, null));
                     }
-                }
 
-                if (addons == null || addons.response.Count == 0)
                     Complete();
+                }
                 else
                 {
-                    List<AddonResponseModel> response = addons.response;
-                    int total_ptrogress = response.Count;
-                    int current_progress = 0;
+                    List<AddonResponseModel> AddonsList = AddonsResponse.response;
+                    int TotalProgress, CurrentProgress = 0;
 
-                    string adons_cache_path = Path.Combine(Global.CachePath, "addons");
-                    if (!Directory.Exists(adons_cache_path))
-                        Directory.CreateDirectory(adons_cache_path);
+                    string DownloadAddonsCachePath = Path.Combine(Global.CachePath, "addons");
+                    if (!Directory.Exists(DownloadAddonsCachePath))
+                        Directory.CreateDirectory(DownloadAddonsCachePath);
 
-                    foreach (AddonResponseModel addon in response)
+                    Dictionary<string, string> AddonsToRemoveList = new Dictionary<string, string>();
+                    TotalProgress = ModsAndHashesExists.Count;
+
+                    foreach (KeyValuePair<string, string> entry in ModsAndHashesExists)
                     {
-                        string hash = addon.hash;
-                        string zipFilePath = Path.Combine(adons_cache_path, addon.name.Replace(".jar", ".zip"));
-                        string findAddon = find_mods_and_hashes.FirstOrDefault(x => x.Key == hash).Value;
-                        bool isExist = cache_hashes.Exists(x => x == hash);
+                        string path = entry.Value;
+                        string hash = entry.Key;
 
-                        if (isExist && findAddon != null)
-                            RecalculateProgress(ref current_progress, total_ptrogress);
+                        if (!AddonsList.Exists(x => x.hash == hash))
+                            AddonsToRemoveList.Add(hash, path);
+
+                        RecalculateProgress(ref CurrentProgress, TotalProgress);
+                    }
+
+                    CurrentProgress = 0;
+                    TotalProgress = AddonsToRemoveList.Count;
+
+                    foreach (KeyValuePair<string, string> entry in AddonsToRemoveList)
+                    {
+                        string path = entry.Value;
+                        string hash = entry.Key;
+
+                        if (File.Exists(path))
+                            File.Delete(path);
+
+                        AddonsCacheHashesList.RemoveAll(x => x == hash);
+                        Global.MainWindowUI.WriteTextToLogBox($"Remove addon - {Path.GetFileName(path)}");
+
+                        RecalculateProgress(ref CurrentProgress, TotalProgress);
+                    }
+
+                    CurrentProgress = 0;
+                    TotalProgress = AddonsList.Count;
+
+                    foreach (AddonResponseModel Addon in AddonsList)
+                    {
+                        string FileHash = Addon.hash;
+                        string DownloadZipFilePath = Path.Combine(DownloadAddonsCachePath, Addon.name.Replace(".jar", ".zip"));
+                        string FoundExistingAddon = ModsAndHashesExists.FirstOrDefault(x => x.Key == FileHash).Value;
+                        bool IsExist = AddonsCacheHashesList.Exists(x => x == FileHash);
+
+                        if (IsExist && FoundExistingAddon != null)
+                        {
+                            ChangeAddonState(FoundExistingAddon, Addon.enabled);
+                            RecalculateProgress(ref CurrentProgress, TotalProgress);
+                        }
                         else
                         {
                             using (var client = new WebClient())
@@ -139,21 +148,24 @@ namespace WPF_Minecraft_Launcher.Components
                                 client.DownloadProgressChanged += DownloadVersion_DownloadProgressChanged;
                                 client.DownloadFileCompleted += new AsyncCompletedEventHandler((object sender, AsyncCompletedEventArgs e) =>
                                 {
-                                    var z = new SharpZip(zipFilePath);
-                                    z.ProgressEvent += Z_ProgressEvent;
-                                    z.Unzip(mods_path);
+                                    var z = new SharpZip(DownloadZipFilePath);
+                                    z.ProgressEvent += UnzipProgressEvent;
+                                    z.Unzip(MinecraftModsPath);
 
-                                    if (File.Exists(zipFilePath))
-                                        File.Delete(zipFilePath);
+                                    if (File.Exists(DownloadZipFilePath))
+                                        File.Delete(DownloadZipFilePath);
 
-                                    if (!cache_hashes.Exists(x => x == hash))
-                                        cache_hashes.Add(hash);
+                                    if (!AddonsCacheHashesList.Exists(x => x == FileHash))
+                                        AddonsCacheHashesList.Add(FileHash);
 
-                                    Global.mainWindow.AddLineToLog($"Add new addon - {addon.name}");
-                                    RecalculateProgress(ref current_progress, total_ptrogress);
+                                    string DownloadedAddonFilePath = Path.Combine(MinecraftModsPath, Addon.name);
+                                    ChangeAddonState(DownloadedAddonFilePath, Addon.enabled);
+
+                                    Global.MainWindowUI.WriteTextToLogBox($"Add new addon - {Addon.name}");
+                                    RecalculateProgress(ref CurrentProgress, TotalProgress);
                                 });
 
-                                await client.DownloadFileTaskAsync(new Uri(addon.link), zipFilePath);
+                                await client.DownloadFileTaskAsync(new Uri(Addon.link), DownloadZipFilePath);
                             }
                         }
                     }
@@ -166,13 +178,25 @@ namespace WPF_Minecraft_Launcher.Components
             }
         }
 
-        private void RecalculateProgress(ref int current_progress, int total_ptrogress)
+        private void ChangeAddonState(string FilePath, bool Enabled)
         {
-            current_progress++;
-            int result = (current_progress / total_ptrogress) * 100;
-            DownloadVersion_DownloadProgressChanged(null, new ProgressChangedEventArgs(result, null));
+            if (File.Exists(FilePath))
+            {
+                if (Enabled && Path.GetExtension(FilePath) == ".disable")
+                    Path.ChangeExtension(FilePath, ".jar");
+                else if (!Enabled && Path.GetExtension(FilePath) == ".jar")
+                    Path.ChangeExtension(FilePath, ".disable");
+            }
+        }
 
-            if (current_progress == total_ptrogress)
+        private void RecalculateProgress(ref int CurrentProgress, int TotalProgress)
+        {
+            CurrentProgress++;
+
+            int result = (CurrentProgress / TotalProgress) * 100;
+            DownloadVersion_DownloadProgressChanged(this, new ProgressChangedEventArgs(result, null));
+
+            if (CurrentProgress == TotalProgress)
                 Complete();
         }
 
@@ -180,19 +204,19 @@ namespace WPF_Minecraft_Launcher.Components
         {
             try
             {
-                string text = JsonConvert.SerializeObject(cache_hashes);
-                using (var writer = new StreamWriter(cache_path))
+                string AddonsHashesJsonText = JsonConvert.SerializeObject(AddonsCacheHashesList);
+                using (var writer = new StreamWriter(AddonsCachePath))
                 {
-                    writer.Write(text);
+                    writer.Write(AddonsHashesJsonText);
                     writer.Close();
                 }
             }
             catch { }
 
-            Global.mainWindow.AddLineToLog($"Downloading addons completed");
-            DownloadCompleted.Invoke();
+            Global.MainWindowUI.WriteTextToLogBox($"Downloading addons completed");
+            DownloadCompleted?.Invoke();
         }
-        private void Z_ProgressEvent(object sender, int e)
+        private void UnzipProgressEvent(object sender, int e)
         {
             ProgressChanged?.Invoke(this, new ProgressChangedEventArgs(e, null));
         }

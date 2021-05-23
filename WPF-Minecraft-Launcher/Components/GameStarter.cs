@@ -1,19 +1,8 @@
-﻿using Avalonia.Threading;
-using CmlLib.Core;
+﻿using CmlLib.Core;
 using CmlLib.Core.Auth;
-using CmlLib.Core.Downloader;
-using CmlLib.Core.Version;
-using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
@@ -22,126 +11,126 @@ namespace WPF_Minecraft_Launcher.Components
 {
     public class GameStarter
     {
-        private MainWindow window;
-        private MainWindowModel content;
-        private Thread gameThread;
-        private MSession userMinecraftSession;
-        private MinecraftPath minecraftPath;
-        private Profile profile;
-        private MLauncherLogin launcherLogin = new MLauncherLogin();
-        internal static GameModel gameModel = new GameModel();
+        private MainWindow MainWindowUI;
+        private MainWindowModel MainWindowContext;
+        private Thread GameThread;
+        private MSession MinecraftUserSession;
+        private MinecraftPath GameDirectoryPath;
+        private Profile UserProfile;
+        private MLauncherLogin MinecraftLauncherAuthorizer = new MLauncherLogin();
+        internal static GameModel GameProcessObject = new GameModel();
 
         public GameStarter(MainWindow window, Profile profile)
         {
-            this.profile = profile;
-            this.window = window;
-            this.content = window.content;
+            this.UserProfile = profile;
+            this.MainWindowUI = window;
+            this.MainWindowContext = window.Context;
         }
 
         internal void Launch()
         {
-            Global.mainWindow.switchUiActive(false);
+            Global.MainWindowUI.SwitchActiveUI(false);
 
-            MLoginResponse response = launcherLogin.TryAutoLogin();
-            if (response.Result != MLoginResult.Success)
+            MLoginResponse Response = MinecraftLauncherAuthorizer.TryAutoLogin();
+            if (Response.Result != MLoginResult.Success)
             {
-                Global.mainWindow.switchUiActive(true);
+                Global.MainWindowUI.SwitchActiveUI(true);
 
-                if (profile.username.Length != 0 && profile.password.Length != 0)
-                    Launch(profile.username, profile.password);
+                if (UserProfile.UserName.Length != 0 && UserProfile.UserPassword.Length != 0)
+                    Launch(UserProfile.UserName, UserProfile.UserPassword);
             }
             else
-                Launch(response);
+                Launch(Response);
         }
 
         internal void Launch(string username, string password)
         {
-            MLoginResponse response = launcherLogin.Authenticate(username, password);
-            Launch(response);
+            MLoginResponse Response = MinecraftLauncherAuthorizer.Authenticate(username, password);
+            Launch(Response);
         }
 
-        internal void Launch(MLoginResponse response)
+        internal void Launch(MLoginResponse Response)
         {
-            content.fileChangedValue = 0;
-            content.progressChangedValue = 0;
+            MainWindowContext.FileChangeValue = 0;
+            MainWindowContext.ProgressChangeValue = 0;
 
             //userMinecraftSession = MSession.GetOfflineSession(content.username);
 
-            if (response.IsSuccess)
+            if (Response.IsSuccess)
             {
-                Global.mainWindow.switchUiActive(false);
+                Global.MainWindowUI.SwitchActiveUI(false);
 
-                userMinecraftSession = response.Session;
-                profile.token = response.Session.AccessToken;
+                MinecraftUserSession = Response.Session;
+                UserProfile.AccessToken = Response.Session.AccessToken;
 
-                minecraftPath = new MinecraftPath(Global.MinecraftPath);
+                GameDirectoryPath = new MinecraftPath(Global.MinecraftPath);
 
-                gameThread = new Thread(OnLaunchMinecraft);
-                gameThread.IsBackground = true;
-                gameThread.Priority = ThreadPriority.Normal;
-                gameThread.Start();
+                GameThread = new Thread(OnLaunchMinecraft);
+                GameThread.IsBackground = true;
+                GameThread.Priority = ThreadPriority.Normal;
+                GameThread.Start();
 
-                gameModel.minecraftPath = minecraftPath;
-                gameModel.session = userMinecraftSession;
-                gameModel.starterThread = gameThread;
+                GameProcessObject.minecraftPath = GameDirectoryPath;
+                GameProcessObject.session = MinecraftUserSession;
+                GameProcessObject.starterThread = GameThread;
             }
             else
-                Global.mainWindow.switchUiActive(true);
+                Global.MainWindowUI.SwitchActiveUI(true);
         }
 
         private void OnLaunchMinecraft()
         {
-            var javaDownloader = new JavaRuntimeDownloader();
-            var addonsDownloader = new AddonsDownloader();
+            var JavaDownloaderService = new JavaRuntimeDownloader();
+            var AddonsDownloaderService = new AddonsDownloader();
 
-            javaDownloader.ProgressChanged += (s, e) =>
+            JavaDownloaderService.ProgressChanged += (s, e) =>
             {
-                content.progressChangedMin = 0;
-                content.progressChangedMax = 100;
-                content.progressChangedValue = e.ProgressPercentage;
-                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
             };
-            javaDownloader.DownloadCompleted = (string javapath) => Launcher_Start(javapath);
+            JavaDownloaderService.DownloadCompleted = (string JavaRuntimeDirectoryPath) => Launcher_Start(JavaRuntimeDirectoryPath);
 
-            addonsDownloader.ProgressChanged += (s, e) =>
+            AddonsDownloaderService.ProgressChanged += (s, e) =>
             {
-                content.progressChangedMin = 0;
-                content.progressChangedMax = 100;
-                content.progressChangedValue = e.ProgressPercentage;
-                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
             };
-            addonsDownloader.DownloadCompleted = () => javaDownloader.CheckJava();
+            AddonsDownloaderService.DownloadCompleted = () => JavaDownloaderService.CheckJava();
 
-            Task.Run(() => addonsDownloader.Download());
+            Task.Run(() => AddonsDownloaderService.Download());
         }
 
         private void Launcher_Start(string javapath)
         {
-            MinecraftVersionModel version = MinecraftVersion.GetVersion();
-            if (version == null)
+            MinecraftVersionModel Version = MinecraftVersion.GetVersion();
+            if (Version == null)
             {
-                window.AddLineToLog("Failed to get the latest version.");
-                window.switchUiActive(true);
+                MainWindowUI.WriteTextToLogBox("Failed to get the latest version.");
+                MainWindowUI.SwitchActiveUI(true);
                 return;
             }
 
-            string authlib_path = Path.Combine(Global.MinecraftPath, "authlib.jar");
-            if (!File.Exists(authlib_path))
-                File.WriteAllBytes(authlib_path, Properties.Resources.authlib);
+            string InjectorFilePath = Path.Combine(Global.MinecraftPath, "authlib.jar");
+            if (!File.Exists(InjectorFilePath))
+                File.WriteAllBytes(InjectorFilePath, Properties.Resources.authlib);
 
             int MinimumRAM = 2048;
             int MaximumRAM = Global.LauncherConfig.MaxRAM < MinimumRAM ? MinimumRAM : Global.LauncherConfig.MaxRAM;
 
-            var launchOption = new MLaunchOption
+            var MinecraftOptions = new MLaunchOption
             {
-                Session = userMinecraftSession,
+                Session = MinecraftUserSession,
                 GameLauncherName = "Minecraft-Client-Pipbuck",
                 VersionType = "Minecraft-Client-Pipbuck",
                 GameLauncherVersion = "1.0.0",
                 JavaPath = javapath,
                 JVMArguments = new string[]
                 {
-                    $"-javaagent:{authlib_path}=" + Global.LauncherConfig.AuthserverAddress,
+                    $"-javaagent:{InjectorFilePath}=" + Global.LauncherConfig.AuthserverAddress,
                     "-Dauthlibinjector.debug",
                     "-Dauthlibinjector.noLogFile",
                     $"-Xms{MinimumRAM}m",
@@ -151,9 +140,9 @@ namespace WPF_Minecraft_Launcher.Components
                 ServerPort = Global.LauncherConfig.ServerPort,
             };
 
-            var launcher = new CMLauncher(minecraftPath);
+            var LauncherService = new CMLauncher(GameDirectoryPath);
 
-            launcher.FileChanged += (e) =>
+            LauncherService.FileChanged += (e) =>
             {
                 string FileKind = e.FileKind.ToString();
                 string FileName = e.FileName;
@@ -161,74 +150,74 @@ namespace WPF_Minecraft_Launcher.Components
                 int TotalFileCount = e.TotalFileCount;
                 string text = string.Format("[{0}] {1} - {2}/{3}", FileKind, FileName, ProgressedFileCount, TotalFileCount);
 
-                content.fileChangedMin = 0;
-                content.fileChangedMax = TotalFileCount;
-                content.fileChangedValue = ProgressedFileCount;
+                MainWindowContext.FileChangeMinimum = 0;
+                MainWindowContext.FileChangeMaximum = TotalFileCount;
+                MainWindowContext.FileChangeValue = ProgressedFileCount;
 
                 if (FileKind.ToLower() != "resource" || FileName.Length != 0)
-                    window.AddLineToLog(text);
+                    MainWindowUI.WriteTextToLogBox(text);
 
                 if (ProgressedFileCount == TotalFileCount)
-                    window.AddLineToLog(text);
+                    MainWindowUI.WriteTextToLogBox(text);
 
-                content.fileChangedText = text;
+                MainWindowContext.FileChangeText = text;
             };
 
-            launcher.ProgressChanged += (s, e) =>
+            LauncherService.ProgressChanged += (s, e) =>
             {
-                content.progressChangedMin = 0;
-                content.progressChangedMax = 100;
-                content.progressChangedValue = e.ProgressPercentage;
-                content.progressChangedText = $"{content.progressChangedValue}/{content.progressChangedMax}%";
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
             };
 
-            launcher.LogOutput += (s, e) => Global.LauncherLogger.Write(e);
+            LauncherService.LogOutput += (s, e) => Global.LauncherLogger.Write(e);
 
-            Process process;
+            Process GameProcess;
 
-            string minecraft_version = version.response.minecraft_version;
-            string forge_version = version.response.forge_version;
+            string ActualMinecraftVersion = Version.response.minecraft_version;
+            string ActualForgeVersion = Version.response.forge_version;
 
-            if (minecraft_version.Length != 0)
+            if (ActualMinecraftVersion.Length != 0)
             {
-                window.AddLineToLog("The launcher will download the required packages, please wait.");
+                MainWindowUI.WriteTextToLogBox("The launcher will download the required packages, please wait.");
 
-                if (forge_version.Length != 0)
-                    process = launcher.CreateProcess(minecraft_version, forge_version, launchOption);
+                if (ActualForgeVersion.Length != 0)
+                    GameProcess = LauncherService.CreateProcess(ActualMinecraftVersion, ActualForgeVersion, MinecraftOptions);
                 else
-                    process = launcher.CreateProcess(minecraft_version, launchOption);
+                    GameProcess = LauncherService.CreateProcess(ActualMinecraftVersion, MinecraftOptions);
 
-                Process_Start(process);
+                Process_Start(GameProcess);
             }
             else
             {
-                window.AddLineToLog("Error. Invalid version information, empty string.");
-                window.switchUiActive(true);
+                MainWindowUI.WriteTextToLogBox("Error. Invalid version information, empty string.");
+                MainWindowUI.SwitchActiveUI(true);
             }
         }
 
-        private void Process_Start(Process process)
+        private void Process_Start(Process GameProcess)
         {
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.ErrorDialog = true;
-            process.EnableRaisingEvents = true;
-            process.ErrorDataReceived += Process_ErrorDataReceived;
-            process.OutputDataReceived += Process_OutputDataReceived;
-            process.Exited += Process_Exited;
-            gameModel.gameProcess = process;
+            GameProcess.StartInfo.UseShellExecute = false;
+            GameProcess.StartInfo.RedirectStandardOutput = true;
+            GameProcess.StartInfo.RedirectStandardError = true;
+            GameProcess.StartInfo.ErrorDialog = true;
+            GameProcess.EnableRaisingEvents = true;
+            GameProcess.ErrorDataReceived += Process_ErrorDataReceived;
+            GameProcess.OutputDataReceived += Process_OutputDataReceived;
+            GameProcess.Exited += Process_Exited;
+            GameProcessObject.gameProcess = GameProcess;
 
-            window.AddLineToLog("Starting the game process.");
+            MainWindowUI.WriteTextToLogBox("Starting the game process.");
 
-            Global.LauncherLogger.Write(process.StartInfo.Arguments, "PARAMS");
+            Global.LauncherLogger.Write(GameProcess.StartInfo.Arguments, "PARAMS");
 
-            if (process.Start())
+            if (GameProcess.Start())
             {
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
+                GameProcess.BeginErrorReadLine();
+                GameProcess.BeginOutputReadLine();
 
-                window.processName = process.ProcessName;
+                MainWindowUI.MinecraftProcessName = GameProcess.ProcessName;
 
 #if (!DEBUG)
                 Dispatcher.UIThread.InvokeAsync(() => window.Hide());
@@ -236,33 +225,33 @@ namespace WPF_Minecraft_Launcher.Components
             }
             else
             {
-                window.AddLineToLog("Error! Failed to start the game! Please check the file - pipbuck-launcher.log");
-                window.switchUiActive(true);
+                MainWindowUI.WriteTextToLogBox("Error! Failed to start the game! Please check the file - pipbuck-launcher.log");
+                MainWindowUI.SwitchActiveUI(true);
             }
 
-            window.resetProgress();
+            MainWindowUI.ResetAllProgressBars();
         }
 
-        private void Process_Exited(object? sender, EventArgs e) => window.gameCLosed();
+        private void Process_Exited(object? sender, EventArgs e) => MainWindowUI.CloseMinecraftProcess();
 
         private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e)
         {
-            string? data = e.Data?.ToString();
+            string? GameLog = e.Data?.ToString();
 
-            if (data == null)
+            if (GameLog == null)
                 return;
 
-            Global.GameLogger.Write(data);
+            Global.GameLogger.Write(GameLog);
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
-            string? data = e.Data?.ToString();
+            string? GameErrorLog = e.Data?.ToString();
 
-            if (data == null)
+            if (GameErrorLog == null)
                 return;
 
-            Global.GameErrorsLogger.Write(data, "ERROR");
+            Global.GameErrorsLogger.Write(GameErrorLog, "ERROR");
         }
     }
 }

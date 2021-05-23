@@ -10,13 +10,13 @@ namespace WPF_Minecraft_Launcher
 {
     public partial class SettingsWindow : Window
     {
-        internal SettingsWindowModel content = new SettingsWindowModel();
+        internal SettingsWindowModel Context = new SettingsWindowModel();
 
         public SettingsWindow()
         {
             InitializeComponent();
 
-            this.DataContext = content;
+            this.DataContext = Context;
             this.Closed += SettingsWindow_Closed;
 
 #if DEBUG
@@ -28,9 +28,9 @@ namespace WPF_Minecraft_Launcher
 
         private void SettingsWindow_Closed(object? sender, System.EventArgs e)
         {
-            string config_path = Path.Combine(Global.ConfigPath, "config.json");
-            string config_json = JsonConvert.SerializeObject(Global.LauncherConfig, Formatting.Indented);
-            File.WriteAllText(config_path, config_json);
+            string ConfigFilePath = Path.Combine(Global.ConfigPath, "config.json");
+            string ConfigJsonText = JsonConvert.SerializeObject(Global.LauncherConfig, Formatting.Indented);
+            File.WriteAllText(ConfigFilePath, ConfigJsonText);
         }
 
         private void InitializeComponent()

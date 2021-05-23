@@ -1,29 +1,23 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
-using CmlLib.Core;
-using CmlLib.Core.Auth;
 using Avalonia.Interactivity;
 using WPF_Minecraft_Launcher.Models;
-using System.Threading.Tasks;
 using Avalonia.Threading;
-using System.Threading;
 using System.Diagnostics;
 using System;
 using System.IO;
 using WPF_Minecraft_Launcher.Components;
-using System.Collections.Generic;
-using System.Net.Http;
 using Newtonsoft.Json;
 
 namespace WPF_Minecraft_Launcher
 {
     public partial class MainWindow : Window
     {
-        internal MainWindowModel content = new MainWindowModel();
-        internal string processName;
+        internal MainWindowModel Context = new MainWindowModel();
+        internal string MinecraftProcessName;
 
-        private SettingsWindow settingsWindow;
+        private SettingsWindow SettingsWindowUI;
         private TextBox TextBox_Logs;
         private TextBox TextBox_Username;
         private TextBox TextBox_Password;
@@ -35,10 +29,10 @@ namespace WPF_Minecraft_Launcher
 
             bool mainThreadRegister = ThreadChecker.IsMainThread;
 
-            Global.mainWindow = this;
+            Global.MainWindowUI = this;
             Global.LauncherConfigInit();
 
-            DataContext = content;
+            DataContext = Context;
 
             TextBox_Logs = this.FindControl<TextBox>("TextBox_Logs");
             TextBox_Username = this.FindControl<TextBox>("TextBox_Username");
@@ -46,7 +40,7 @@ namespace WPF_Minecraft_Launcher
             Button_Play = this.FindControl<Button>("Button_Play");
 
             if (File.Exists(Path.Combine(Global.ConfigPath, "authorization.dat")))
-                switchTextBoxActive(false);
+                SwitchTextBoxActive(false);
 
 #if DEBUG
             this.AttachDevTools();
@@ -60,32 +54,31 @@ namespace WPF_Minecraft_Launcher
             AvaloniaXamlLoader.Load(this);
         }
 
-        internal void AddLineToLog(string text)
+        internal void WriteTextToLogBox(object AnyData)
         {
-            if (text == null || text.Length == 0)
+            string? Text = Convert.ToString(AnyData);
+
+            if (Text == null || Text.Length == 0)
                 return;
 
-            string dateTime = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss");
-            string textFormat = string.Format("[{0}] {1}", dateTime, text);
-
-            WebResponseModel? response = null;
+            string CurrentDateTimeText = DateTime.Now.ToString("MM/dd/yyyy HH:mm:ss");
+            string TextFormated = string.Format("[{0}] {1}", CurrentDateTimeText, Text);
 
             try
             {
-                response = JsonConvert.DeserializeObject<WebResponseModel>(text);
-
+                var response = JsonConvert.DeserializeObject<WebResponseModel>(Text);
                 if (response != null)
-                    textFormat = string.Format("[{0}] {1} - {2}", dateTime, response.code, response.message);
+                    TextFormated = string.Format("[{0}] {1} - {2}", CurrentDateTimeText, response.code, response.message);
             }
             catch { }
 
 #if DEBUG
-            Global.LauncherLogger.Write(textFormat);
+            Global.LauncherLogger.Write(TextFormated);
 #endif
 
-            int maxLenght = 300;
-            int textLenght = textFormat.Length;
-            content.logs += textFormat.Substring(0, (textLenght <= maxLenght ? textLenght : maxLenght)) + "\n";
+            int MaxTextLenght = 300;
+            int TextLenght = TextFormated.Length;
+            Context.Logs += TextFormated.Substring(0, (TextLenght <= MaxTextLenght ? TextLenght : MaxTextLenght)) + "\n";
 
             if (ThreadChecker.IsMainThread)
                 TextBox_Logs.CaretIndex = int.MaxValue;
@@ -95,24 +88,24 @@ namespace WPF_Minecraft_Launcher
 
         private void OnAuthorizateClick(object sender, RoutedEventArgs e)
         {
-            if (processName != null && Process.GetProcessesByName(processName).Length > 0)
+            if (MinecraftProcessName != null && Process.GetProcessesByName(MinecraftProcessName).Length > 0)
                 return;
 
-            content.logs = "";
+            Context.Logs = "";
 
-            var profile = new Profile(content.username, content.password);
-            var minecraft = new GameStarter(this, profile);
-            minecraft.Launch();
+            var UserProfile = new Profile(Context.UserName, Context.UserPassword);
+            var MinecraftGameStarter = new GameStarter(this, UserProfile);
+            MinecraftGameStarter.Launch();
         }
 
         private void OnOpenSettings(object sender, RoutedEventArgs e)
         {
-            if (settingsWindow != null)
+            if (SettingsWindowUI != null)
                 return;
 
-            settingsWindow = new SettingsWindow();
-            settingsWindow.Closed += (object? sender, EventArgs e) => settingsWindow = null;
-            settingsWindow.Show();
+            SettingsWindowUI = new SettingsWindow();
+            SettingsWindowUI.Closed += (object? sender, EventArgs e) => SettingsWindowUI = null;
+            SettingsWindowUI.Show();
         }
 
         private void OnOpenSite(object sender, RoutedEventArgs e)
@@ -130,7 +123,7 @@ namespace WPF_Minecraft_Launcher
             this.Close();
         }
 
-        internal void switchUiActive(bool active)
+        internal void SwitchActiveUI(bool active)
         {
             if (ThreadChecker.IsMainThread)
             {
@@ -139,13 +132,13 @@ namespace WPF_Minecraft_Launcher
                 this.TextBox_Password.IsEnabled = active;
             }
             else
-                Dispatcher.UIThread.InvokeAsync(() => switchUiActive(active));
+                Dispatcher.UIThread.InvokeAsync(() => SwitchActiveUI(active));
 
             if (active)
-                resetProgress();
+                ResetAllProgressBars();
         }
 
-        internal void switchWindowShow(bool showing)
+        internal void SwitchShowWindow(bool showing)
         {
             if (ThreadChecker.IsMainThread)
             {
@@ -155,10 +148,10 @@ namespace WPF_Minecraft_Launcher
                     this.Hide();
             }
             else
-                Dispatcher.UIThread.InvokeAsync(() => this.switchWindowShow(showing));
+                Dispatcher.UIThread.InvokeAsync(() => this.SwitchShowWindow(showing));
         }
 
-        internal void switchTextBoxActive(bool showing)
+        internal void SwitchTextBoxActive(bool showing)
         {
             if (ThreadChecker.IsMainThread)
             {
@@ -166,31 +159,31 @@ namespace WPF_Minecraft_Launcher
                 this.TextBox_Password.IsEnabled = showing;
             }
             else
-                Dispatcher.UIThread.InvokeAsync(() => this.switchTextBoxActive(showing));
+                Dispatcher.UIThread.InvokeAsync(() => this.SwitchTextBoxActive(showing));
         }
 
-        internal void resetProgress()
+        internal void ResetAllProgressBars()
         {
             if (ThreadChecker.IsMainThread)
             {
-                content.fileChangedValue = 0;
-                content.progressChangedValue = 0;
+                Context.FileChangeValue = 0;
+                Context.ProgressChangeValue = 0;
             }
             else
-                Dispatcher.UIThread.InvokeAsync(() => resetProgress());
+                Dispatcher.UIThread.InvokeAsync(() => ResetAllProgressBars());
         }
 
-        internal void gameCLosed()
+        internal void CloseMinecraftProcess()
         {
-            switchWindowShow(true);
-            switchUiActive(true);
-            resetProgress();
+            SwitchShowWindow(true);
+            SwitchActiveUI(true);
+            ResetAllProgressBars();
 
-            Process process = GameStarter.gameModel.gameProcess;
+            Process process = GameStarter.GameProcessObject.gameProcess;
             if (process != null)
                 process.Kill();
 
-            AddLineToLog("Game closed");
+            WriteTextToLogBox("Game closed");
         }
     }
 }

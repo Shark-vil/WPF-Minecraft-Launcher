@@ -20,6 +20,7 @@ namespace WPF_Minecraft_Launcher.Models
         public string name { get; set; }
         public string hash { get; set; }
         public string path { get; set; }
+        public bool enabled { get; set; }
         public string created_at { get; set; }
         public string updated_at { get; set; }
         public string link { get; set; }

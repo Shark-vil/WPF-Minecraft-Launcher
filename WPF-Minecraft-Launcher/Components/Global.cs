@@ -1,10 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
 
 namespace WPF_Minecraft_Launcher.Components
@@ -20,7 +16,7 @@ namespace WPF_Minecraft_Launcher.Components
         internal static Logger LauncherLogger;
         internal static Logger GameLogger;
         internal static Logger GameErrorsLogger;
-        internal static MainWindow mainWindow;
+        internal static MainWindow MainWindowUI;
 
         internal static void LauncherConfigInit()
         {
@@ -42,16 +38,16 @@ namespace WPF_Minecraft_Launcher.Components
             LauncherConfig.MaxRAM = 4096;
             LauncherConfig.AuthserverAddress = LauncherConfig.SiteAddress + "/api/authserver/";
 
-            string config_path = Path.Combine(ConfigPath, "config.json");
-            if (File.Exists(config_path))
+            string ConfigFilePath = Path.Combine(ConfigPath, "config.json");
+            if (File.Exists(ConfigFilePath))
             {
-                string config_json = File.ReadAllText(config_path);
-                LauncherConfig = JsonConvert.DeserializeObject<LauncherConfigModel>(config_json);
+                string ConfigJsonText = File.ReadAllText(ConfigFilePath);
+                LauncherConfig = JsonConvert.DeserializeObject<LauncherConfigModel>(ConfigJsonText);
             }
             else
             {
                 string config_json = JsonConvert.SerializeObject(LauncherConfig, Formatting.Indented);
-                File.WriteAllText(config_path, config_json);
+                File.WriteAllText(ConfigFilePath, config_json);
             }
 
             LauncherLogger = new Logger(LauncherConfig.LogFileName);

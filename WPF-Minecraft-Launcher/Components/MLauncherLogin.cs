@@ -1,5 +1,4 @@
-﻿using CmlLib.Core;
-using CmlLib.Core.Auth;
+﻿using CmlLib.Core.Auth;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -178,7 +177,7 @@ namespace WPF_Minecraft_Launcher.Components
                 var rawResponse = res.ReadToEnd();
 
                 if (rawResponse.Length != 0)
-                    Global.mainWindow.AddLineToLog(rawResponse);
+                    Global.MainWindowUI.WriteTextToLogBox(rawResponse);
 
                 if (resHeader.StatusCode == HttpStatusCode.OK) // ResultCode == 200
                     return parseSession(rawResponse, clientToken);
@@ -206,7 +205,7 @@ namespace WPF_Minecraft_Launcher.Components
             {
                 string response = ex.ToString();
                 if (response.Length != 0)
-                    Global.mainWindow.AddLineToLog(response);
+                    Global.MainWindowUI.WriteTextToLogBox(response);
 
                 return new MLoginResponse(MLoginResult.UnknownError, null, response, null);
             }
@@ -254,7 +253,7 @@ namespace WPF_Minecraft_Launcher.Components
                 var rawResponse = res.ReadToEnd();
 
                 if (rawResponse.Length != 0)
-                    Global.mainWindow.AddLineToLog(rawResponse);
+                    Global.MainWindowUI.WriteTextToLogBox(rawResponse);
 
                 if ((int)resHeader.StatusCode / 100 == 2)
                     return parseSession(rawResponse, session.ClientToken);
@@ -282,7 +281,7 @@ namespace WPF_Minecraft_Launcher.Components
             {
                 string response = res.ReadToEnd();
                 if (response.Length != 0)
-                    Global.mainWindow.AddLineToLog(response);
+                    Global.MainWindowUI.WriteTextToLogBox(response);
 
                 if (resHeader.StatusCode == HttpStatusCode.NoContent) // StatusCode == 204
                     return new MLoginResponse(MLoginResult.Success, session, null, null);
@@ -312,7 +311,7 @@ namespace WPF_Minecraft_Launcher.Components
             };
 
             var res = mojangRequest("invalidate", job.ToString());
-            Global.mainWindow.AddLineToLog($"Invalidate - {res.StatusCode}");
+            Global.MainWindowUI.WriteTextToLogBox($"Invalidate - {res.StatusCode}");
             return res.StatusCode == HttpStatusCode.NoContent; // 204
         }
 
@@ -325,7 +324,7 @@ namespace WPF_Minecraft_Launcher.Components
             };
 
             var res = mojangRequest("signout", job.ToString());
-            Global.mainWindow.AddLineToLog($"Signout - {res.StatusCode}");
+            Global.MainWindowUI.WriteTextToLogBox($"Signout - {res.StatusCode}");
             return res.StatusCode == HttpStatusCode.NoContent; // 204
         }
     }

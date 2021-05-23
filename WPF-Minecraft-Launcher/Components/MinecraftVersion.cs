@@ -1,17 +1,12 @@
 ﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
 
 namespace WPF_Minecraft_Launcher.Components
 {
     public class MinecraftVersion
     {
-        public static MinecraftVersionModel GetVersion()
+        public static MinecraftVersionModel? GetVersion()
         {
             string get_version_url = Global.GetApiAddress("minecraftversion/get_actual");
 

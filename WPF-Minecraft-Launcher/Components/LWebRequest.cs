@@ -1,35 +1,31 @@
 ﻿using Newtonsoft.Json;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WPF_Minecraft_Launcher.Components
 {
     public class LWebResponse
     {
-        internal HttpResponseMessage httpResponseMessage { get; set; }
-        internal HttpContent httpContent { get; set; }
-        internal string htmlTextMessage { get; set; }
+        internal HttpResponseMessage HTTPResponseMessage { get; set; }
+        internal HttpContent HTTPContent { get; set; }
+        internal string ResponseText { get; set; }
 
-        public LWebResponse(HttpResponseMessage httpResponseMessage)
+        public LWebResponse(HttpResponseMessage HTTPResponseMessage)
         {
-            this.httpResponseMessage = httpResponseMessage;
-            httpContent = httpResponseMessage.Content;
-            htmlTextMessage = httpContent.ReadAsStringAsync().Result;
+            this.HTTPResponseMessage = HTTPResponseMessage;
+            HTTPContent = HTTPResponseMessage.Content;
+            ResponseText = HTTPContent.ReadAsStringAsync().Result;
         }
 
         public HttpResponseMessage GetResponse()
         {
-            return httpResponseMessage;
+            return HTTPResponseMessage;
         }
 
         public T? ConvertResponse<T>()
         {
-            if (httpResponseMessage != null)
-                return JsonConvert.DeserializeObject<T>(htmlTextMessage);
+            if (HTTPResponseMessage != null)
+                return JsonConvert.DeserializeObject<T>(ResponseText);
 
             return default(T);
         }
@@ -39,9 +35,9 @@ namespace WPF_Minecraft_Launcher.Components
     {
         private HttpMethod SendMethod = HttpMethod.Get;
         private string WebAddress = "";
-        internal Dictionary<string, string> SendForm = new Dictionary<string, string>();
-        internal HttpClient httpClient = new HttpClient();
-        internal HttpRequestMessage? httpRequestMessage = null;
+        internal Dictionary<string, string> FormData = new Dictionary<string, string>();
+        internal HttpClient HTTPClient = new HttpClient();
+        internal HttpRequestMessage? HTTPRequestMessage = null;
 
         public LWebRequest() { }
 
@@ -49,19 +45,17 @@ namespace WPF_Minecraft_Launcher.Components
 
         public void SetAddress(string WebAddress) => this.WebAddress = WebAddress;
 
-        public void AddValue(string key, string value) => SendForm.Add(key, value);
+        public void AddValue(string key, string value) => FormData.Add(key, value);
 
         public LWebResponse Send(HttpMethod method)
         {
-            httpRequestMessage = new HttpRequestMessage(SendMethod, WebAddress);
-            httpRequestMessage.Method = method;
-#pragma warning disable CS8620 // Аргумент запрещено использовать для параметра из-за различий в отношении допустимости значений NULL для ссылочных типов.
-            httpRequestMessage.Content = new FormUrlEncodedContent(SendForm);
-#pragma warning restore CS8620 // Аргумент запрещено использовать для параметра из-за различий в отношении допустимости значений NULL для ссылочных типов.
-            httpRequestMessage.Headers.Add("Accept", "application/json");
-            httpRequestMessage.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0");
+            HTTPRequestMessage = new HttpRequestMessage(SendMethod, WebAddress);
+            HTTPRequestMessage.Method = method;
+            HTTPRequestMessage.Content = new FormUrlEncodedContent(FormData);
+            HTTPRequestMessage.Headers.Add("Accept", "application/json");
+            HTTPRequestMessage.Headers.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0");
 
-            HttpResponseMessage httpResponseMessage = httpClient.Send(httpRequestMessage);
+            HttpResponseMessage httpResponseMessage = HTTPClient.Send(HTTPRequestMessage);
 
             return new LWebResponse(httpResponseMessage);
         }
