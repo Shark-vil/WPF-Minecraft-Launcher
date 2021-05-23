@@ -39,7 +39,7 @@ namespace WPF_Minecraft_Launcher.Components
             try
             {
                 string GetActualJavaVersionURL = Global.GetApiAddress("javaversion/get_actual");
-                ActualVersionModel ActualVersion = null;
+                ActualVersionModel? ActualVersion = null;
 
                 using (var client = new WebClient())
                 {
@@ -55,7 +55,7 @@ namespace WPF_Minecraft_Launcher.Components
                     string SavedJavaVersionHash = File.ReadAllText(JavaVersionCacheHashPath);
                     if (SavedJavaVersionHash == ActualVersion.response.hash)
                     {
-                        DownloadCompleted.Invoke(JavaRuntimeFilePath);
+                        DownloadCompleted?.Invoke(JavaRuntimeFilePath);
                         return;
                     }
                 }
@@ -98,7 +98,7 @@ namespace WPF_Minecraft_Launcher.Components
                         if (File.Exists(DownloadVersionCachePath))
                             File.Delete(DownloadVersionCachePath);
 
-                        DownloadCompleted.Invoke(JavaRuntimeFilePath);
+                        DownloadCompleted?.Invoke(JavaRuntimeFilePath);
                     });
 
                     client.DownloadFileAsync(new Uri(ActualVersion.response.link), DownloadVersionCachePath);

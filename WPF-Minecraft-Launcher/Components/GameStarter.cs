@@ -106,7 +106,7 @@ namespace WPF_Minecraft_Launcher.Components
 
         private void Launcher_Start(string javapath)
         {
-            MinecraftVersionModel Version = MinecraftVersion.GetVersion();
+            MinecraftVersionModel? Version = MinecraftVersion.GetVersion();
             if (Version == null)
             {
                 MainWindowUI.WriteTextToLogBox("Failed to get the latest version.");
