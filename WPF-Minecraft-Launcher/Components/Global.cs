@@ -12,6 +12,8 @@ namespace WPF_Minecraft_Launcher.Components
         internal static string MinecraftPath = Path.Combine(ApplicationPath, "minecraft");
         internal static string ConfigPath = Path.Combine(ApplicationPath, "launcher");
         internal static string CachePath = Path.Combine(ConfigPath, "cache");
+        internal static string VersionFilePath = Path.Combine(ConfigPath, "version.dat");
+        internal const string LauncherVersion = "1.0.6";
 
         internal static Logger? LauncherLogger;
         internal static Logger? GameLogger;
@@ -37,6 +39,9 @@ namespace WPF_Minecraft_Launcher.Components
             LauncherConfig.ServerPort = 25565;
             LauncherConfig.MaxRAM = 4096;
             LauncherConfig.AuthserverAddress = LauncherConfig.SiteAddress + "/api/authserver/";
+
+            if (!File.Exists(VersionFilePath))
+                File.WriteAllText(VersionFilePath, LauncherVersion);
 
             string ConfigFilePath = Path.Combine(ConfigPath, "config.json");
             if (File.Exists(ConfigFilePath))
