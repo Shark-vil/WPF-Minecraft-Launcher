@@ -4,17 +4,22 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
+using System.Threading.Tasks;
 
 namespace WPF_Minecraft_Launcher_Updater
 {
     class Program
     {
         private static string ApplicationDirectoryPath = AppContext.BaseDirectory;
-        private static string ConfigirectoryPath = Path.Combine(ApplicationDirectoryPath, "launcher");
         private static string LogFilePath = Path.Combine(ApplicationDirectoryPath, "laucnherupdate.log");
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
+            string ApplicationParentDirectoryPath = new FileInfo(ApplicationDirectoryPath).Directory.Parent.FullName;
+            string ConfigirectoryPath = Path.Combine(ApplicationParentDirectoryPath, "launcher");
+
+            _ = Task.Delay(1000);
+
             if (!Directory.Exists(ConfigirectoryPath))
                 Directory.CreateDirectory(ConfigirectoryPath);
 
@@ -32,20 +37,20 @@ namespace WPF_Minecraft_Launcher_Updater
             {
                 string ConfigData = File.ReadAllText(ConfigPath);
                 string SiteAddress = JObject.Parse(ConfigData)["SiteAddress"].ToString();
-                string HashPath = Path.Combine(ConfigirectoryPath, "launcherhash.dat");
+                string VersionFilePath = Path.Combine(ConfigirectoryPath, "version.dat");
                 LauncherModel LauncherObject;
 
                 print("Requesting version information");
 
                 using (var client = new WebClient())
                 {
-                    string JsonData = client.DownloadString(SiteAddress);
+                    string JsonData = client.DownloadString(SiteAddress + "/api/launcherversion/get_actual");
                     LauncherObject = JsonConvert.DeserializeObject<LauncherModel>(JsonData);
 
-                    if (File.Exists(HashPath))
+                    if (File.Exists(VersionFilePath))
                     {
-                        string CurrentHash = File.ReadAllText(HashPath);
-                        if (CurrentHash == LauncherObject.response.hash)
+                        string CurrentVersion = File.ReadAllText(VersionFilePath);
+                        if (CurrentVersion == LauncherObject.response.tag)
                         {
                             print("The version is the same, no update is required");
                             return;
@@ -65,10 +70,20 @@ namespace WPF_Minecraft_Launcher_Updater
                     {
                         string FileName = "update.zip";
                         string FilePath = Path.Combine(ApplicationDirectoryPath, FileName);
+                        var VisualProgressBar = new ProgressBar();
 
-                        print("Loading the archive. Please wait.");
+                        client.DownloadProgressChanged += (object sender, DownloadProgressChangedEventArgs e) =>
+                        {
+                            int percent = e.ProgressPercentage;
+                            VisualProgressBar.Report((double) percent / 100);
+                        };
 
-                        client.DownloadFile(LauncherObject.response.path, FilePath);
+                        if (File.Exists(FilePath))
+                            File.Delete(FilePath);
+
+                        await client.DownloadFileTaskAsync(new Uri(LauncherObject.response.link), FilePath);
+
+                        VisualProgressBar.Dispose();
 
                         print("Archive download completed");
 
@@ -76,9 +91,12 @@ namespace WPF_Minecraft_Launcher_Updater
                         {
                             print("Unzip the archive");
 
-                            ZipFile.ExtractToDirectory(FilePath, ApplicationDirectoryPath, true);
+                            ZipFile.ExtractToDirectory(FilePath, ApplicationParentDirectoryPath, true);
 
                             print("Update download completed");
+
+                            File.Delete(FilePath);
+                            File.WriteAllText(VersionFilePath, LauncherObject.response.tag);
                         }
                         else
                             print("The downloaded archive file was not found");
@@ -97,7 +115,7 @@ namespace WPF_Minecraft_Launcher_Updater
         {
             string NormalizeText = string.Format("[{0}] {1}", DateTime.Now, Convert.ToString(text));
             Console.WriteLine(NormalizeText);
-            File.AppendAllText(LogFilePath, NormalizeText);
+            File.AppendAllText(LogFilePath, NormalizeText + "\n");
         }
     }
 }

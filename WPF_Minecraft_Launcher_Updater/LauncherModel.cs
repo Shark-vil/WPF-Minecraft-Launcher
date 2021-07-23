@@ -14,7 +14,13 @@ namespace WPF_Minecraft_Launcher_Updater
 
     public class LauncherResponseModel
     {
+        public int id { get; set; }
+        public string tag { get; set; }
         public string path { get; set; }
         public string hash { get; set; }
+        public int actual { get; set; }
+        public string created_at { get; set; }
+        public string updated_at { get; set; }
+        public string link { get; set; }
     }
 }
