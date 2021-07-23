@@ -6,6 +6,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using WPF_Minecraft_Launcher.Components;
 
 namespace WPF_Minecraft_Launcher.Models
 {
@@ -14,6 +15,7 @@ namespace WPF_Minecraft_Launcher.Models
         private string _UserName = "";
         private string _UserPassword = "";
         private string _Logs = "";
+        private string _StartButtonText = "Запуск";
         private int _FileChangeMinimum = 0;
         private int _FileChangeMaximum = 100;
         private int _FileChangeValue = 0;
@@ -22,6 +24,7 @@ namespace WPF_Minecraft_Launcher.Models
         private int _ProgressChangeMaximum = 100;
         private int _ProgressChangeValue = 0;
         private string _ProgressChangeText = "";
+        private string _Version = Global.LauncherVersion;
 
         internal string UserName
         {
@@ -39,6 +42,16 @@ namespace WPF_Minecraft_Launcher.Models
             set
             {
                 _UserPassword = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal string StartButtonText
+        {
+            get { return _StartButtonText; }
+            set
+            {
+                _StartButtonText = value;
                 OnPropertyChanged();
             }
         }
@@ -129,6 +142,16 @@ namespace WPF_Minecraft_Launcher.Models
             set
             {
                 _ProgressChangeText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal string Version
+        {
+            get { return _Version; }
+            set
+            {
+                _Version = value;
                 OnPropertyChanged();
             }
         }

@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:web="clr-namespace:TheArtOfDev.HtmlRenderer.Avalonia"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="480"
         x:Class="WPF_Minecraft_Launcher.MainWindow"
         WindowStartupLocation="CenterScreen"
@@ -30,6 +31,7 @@
       <MenuItem Header="Настройки" >
         <MenuItem Click="OnOpenSettings" Header="Конфигурация"></MenuItem>
       </MenuItem>
+      <MenuItem Header="{Binding Version}"></MenuItem>
     </Menu>
     
     <StackPanel Grid.Row="2" Grid.RowSpan="1" Grid.Column="0" Background="Gray" Margin="5">
@@ -43,7 +45,7 @@
       </DockPanel>
       <Button x:Name="Button_Play" Click="OnAuthorizateClick" Foreground="White" BorderBrush="Black"
               HorizontalAlignment="Stretch" Height="30" Margin="10, 25, 10, 0">
-        <TextBlock Text="Вход" HorizontalAlignment="Center"/>
+        <TextBlock Text="{Binding StartButtonText}" HorizontalAlignment="Center"/>
       </Button>
     </StackPanel>
 

@@ -1,4 +1,5 @@
-﻿using CmlLib.Core;
+﻿using Avalonia.Threading;
+using CmlLib.Core;
 using CmlLib.Core.Auth;
 using System;
 using System.Diagnostics;
@@ -13,9 +14,9 @@ namespace WPF_Minecraft_Launcher.Components
     {
         private MainWindow MainWindowUI;
         private MainWindowModel MainWindowContext;
-        private Thread GameThread;
-        private MSession MinecraftUserSession;
-        private MinecraftPath GameDirectoryPath;
+        private Thread? GameThread;
+        private MSession? MinecraftUserSession;
+        private MinecraftPath? GameDirectoryPath;
         private Profile UserProfile;
         private MLauncherLogin MinecraftLauncherAuthorizer = new MLauncherLogin();
         internal static GameModel GameProcessObject = new GameModel();
@@ -29,15 +30,13 @@ namespace WPF_Minecraft_Launcher.Components
 
         internal void Launch()
         {
-            Global.MainWindowUI.SwitchActiveUI(false);
-
             MLoginResponse Response = MinecraftLauncherAuthorizer.TryAutoLogin();
             if (Response.Result != MLoginResult.Success)
             {
-                Global.MainWindowUI.SwitchActiveUI(true);
-
                 if (UserProfile.UserName.Length != 0 && UserProfile.UserPassword.Length != 0)
                     Launch(UserProfile.UserName, UserProfile.UserPassword);
+                else
+                    Global.MainWindowUI?.SwitchActiveUI(true);
             }
             else
                 Launch(Response);
@@ -58,8 +57,6 @@ namespace WPF_Minecraft_Launcher.Components
 
             if (Response.IsSuccess)
             {
-                Global.MainWindowUI.SwitchActiveUI(false);
-
                 MinecraftUserSession = Response.Session;
                 UserProfile.AccessToken = Response.Session.AccessToken;
 
@@ -75,7 +72,7 @@ namespace WPF_Minecraft_Launcher.Components
                 GameProcessObject.starterThread = GameThread;
             }
             else
-                Global.MainWindowUI.SwitchActiveUI(true);
+                Global.MainWindowUI?.SwitchActiveUI(true);
         }
 
         private void OnLaunchMinecraft()
@@ -101,7 +98,7 @@ namespace WPF_Minecraft_Launcher.Components
             };
             AddonsDownloaderService.DownloadCompleted = () => JavaDownloaderService.CheckJava();
 
-            Task.Run(() => AddonsDownloaderService.Download());
+            AddonsDownloaderService.Download();
         }
 
         private void Launcher_Start(string javapath)
@@ -130,7 +127,7 @@ namespace WPF_Minecraft_Launcher.Components
                 JavaPath = javapath,
                 JVMArguments = new string[]
                 {
-                    $"-javaagent:{InjectorFilePath}=" + Global.LauncherConfig.AuthserverAddress,
+                    $"-javaagent:\"{InjectorFilePath}=" + Global.LauncherConfig.AuthserverAddress + "\"",
                     "-Dauthlibinjector.debug",
                     "-Dauthlibinjector.noLogFile",
                     $"-Xms{MinimumRAM}m",
@@ -171,7 +168,7 @@ namespace WPF_Minecraft_Launcher.Components
                 MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
             };
 
-            LauncherService.LogOutput += (s, e) => Global.LauncherLogger.Write(e);
+            LauncherService.LogOutput += (s, e) => Global.LauncherLogger?.Write(e);
 
             Process GameProcess;
 
@@ -210,7 +207,7 @@ namespace WPF_Minecraft_Launcher.Components
 
             MainWindowUI.WriteTextToLogBox("Starting the game process.");
 
-            Global.LauncherLogger.Write(GameProcess.StartInfo.Arguments, "PARAMS");
+            Global.LauncherLogger?.Write(GameProcess.StartInfo.Arguments, "PARAMS");
 
             if (GameProcess.Start())
             {
@@ -220,7 +217,7 @@ namespace WPF_Minecraft_Launcher.Components
                 MainWindowUI.MinecraftProcessName = GameProcess.ProcessName;
 
 #if (!DEBUG)
-                Dispatcher.UIThread.InvokeAsync(() => window.Hide());
+                Dispatcher.UIThread.InvokeAsync(() => MainWindowUI.Hide());
 #endif
             }
             else
@@ -241,7 +238,7 @@ namespace WPF_Minecraft_Launcher.Components
             if (GameLog == null)
                 return;
 
-            Global.GameLogger.Write(GameLog);
+            Global.GameLogger?.Write(GameLog);
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
@@ -251,7 +248,7 @@ namespace WPF_Minecraft_Launcher.Components
             if (GameErrorLog == null)
                 return;
 
-            Global.GameErrorsLogger.Write(GameErrorLog, "ERROR");
+            Global.GameErrorsLogger?.Write(GameErrorLog, "ERROR");
         }
     }
 }

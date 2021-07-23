@@ -9,6 +9,10 @@ using System;
 using System.IO;
 using WPF_Minecraft_Launcher.Components;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System.Net;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace WPF_Minecraft_Launcher
 {
@@ -39,14 +43,78 @@ namespace WPF_Minecraft_Launcher
             TextBox_Password = this.FindControl<TextBox>("TextBox_Password");
             Button_Play = this.FindControl<Button>("Button_Play");
 
-            if (File.Exists(Path.Combine(Global.ConfigPath, "authorization.dat")))
-                SwitchTextBoxActive(false);
+            this.SwitchTextBoxActiveByValidate();
 
 #if DEBUG
             this.AttachDevTools();
 #else
             this.FindControl<Grid>("Grid_Container").ShowGridLines = false;
 #endif
+
+            CheckLauncherUpdate();
+        }
+
+        private void CheckLauncherUpdate()
+        {
+            string VersionFilePath = Path.Combine(Global.ConfigPath, "version.dat");
+
+            if (!File.Exists(VersionFilePath))
+                StartLauncherUpdate();
+            else
+            {
+                try
+                {
+                    using (var client = new WebClient())
+                    {
+                        string JsonData = client.DownloadString(Global.GetApiAddress("launcherversion/get_actual"));
+
+                        var LauncherObject = JsonConvert.DeserializeObject<LauncherModel>(JsonData);
+
+                        if (LauncherObject == null)
+                            throw new Exception("Failed to convert launcher model to equal object");
+
+                        string ServerVersion = LauncherObject.response.tag;
+                        string CurrentVersion = File.ReadAllText(VersionFilePath);
+
+                        if (CurrentVersion == ServerVersion)
+                            WriteTextToLogBox("The version is the same, no update is required");
+                        else
+                        {
+                            WriteTextToLogBox("The version does not match, an update is required");
+                            StartLauncherUpdate();
+                        }
+                    }
+                }
+                catch(Exception ex)
+                {
+                    WriteTextToLogBox("An error occurred while trying to check the launcher version");
+                    WriteTextToLogBox(ex.ToString());
+                }
+            }
+        }
+
+        private void StartLauncherUpdate()
+        {
+            try
+            {
+                string UpdateFilePath = Path.Combine(Global.ApplicationPath, "update");
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    UpdateFilePath = Path.Combine(UpdateFilePath, "update.exe");
+                else
+                {
+                    UpdateFilePath = Path.Combine(UpdateFilePath, "update");
+                    Process.Start("chmod", $"755 {UpdateFilePath}");
+                }
+
+                Process.Start(UpdateFilePath);
+
+                this.Close();
+            }
+            catch(Exception ex)
+            {
+                Global.LauncherLogger?.Write(ex.ToString(), "ERROR");
+            }
         }
 
         private void InitializeComponent()
@@ -72,9 +140,7 @@ namespace WPF_Minecraft_Launcher
             }
             catch { }
 
-#if DEBUG
-            Global.LauncherLogger.Write(TextFormated);
-#endif
+            Global.LauncherLogger?.Write(TextFormated);
 
             int MaxTextLenght = 300;
             int TextLenght = TextFormated.Length;
@@ -92,6 +158,7 @@ namespace WPF_Minecraft_Launcher
                 return;
 
             Context.Logs = "";
+            SwitchActiveUI(false);
 
             var UserProfile = new Profile(Context.UserName, Context.UserPassword);
             var MinecraftGameStarter = new GameStarter(this, UserProfile);
@@ -128,8 +195,7 @@ namespace WPF_Minecraft_Launcher
             if (ThreadChecker.IsMainThread)
             {
                 this.Button_Play.IsEnabled = active;
-                this.TextBox_Username.IsEnabled = active;
-                this.TextBox_Password.IsEnabled = active;
+                this.SwitchTextBoxActive(active);
             }
             else
                 Dispatcher.UIThread.InvokeAsync(() => SwitchActiveUI(active));
@@ -151,12 +217,28 @@ namespace WPF_Minecraft_Launcher
                 Dispatcher.UIThread.InvokeAsync(() => this.SwitchShowWindow(showing));
         }
 
+        internal void SwitchTextBoxActiveByValidate()
+        { 
+            var MLogin = new MLauncherLogin();
+
+            bool IsValid = (MLogin.Validate().Result == CmlLib.Core.Auth.MLoginResult.Success);
+            if (!IsValid)
+                IsValid = (MLogin.Refresh().Result == CmlLib.Core.Auth.MLoginResult.Success);
+
+            this.SwitchTextBoxActive(!IsValid);
+        }
+
         internal void SwitchTextBoxActive(bool showing)
         {
             if (ThreadChecker.IsMainThread)
             {
                 this.TextBox_Username.IsEnabled = showing;
                 this.TextBox_Password.IsEnabled = showing;
+
+                if (showing)
+                    Context.StartButtonText = "Авторизация";
+                else
+                    Context.StartButtonText = "Запуск";
             }
             else
                 Dispatcher.UIThread.InvokeAsync(() => this.SwitchTextBoxActive(showing));
@@ -178,6 +260,8 @@ namespace WPF_Minecraft_Launcher
             SwitchShowWindow(true);
             SwitchActiveUI(true);
             ResetAllProgressBars();
+
+            SwitchTextBoxActiveByValidate();
 
             Process process = GameStarter.GameProcessObject.gameProcess;
             if (process != null)

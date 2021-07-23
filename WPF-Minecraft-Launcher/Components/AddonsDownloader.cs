@@ -32,7 +32,8 @@ namespace WPF_Minecraft_Launcher.Components
             if (!Directory.Exists(MinecraftModsPath))
                 Directory.CreateDirectory(MinecraftModsPath);
 
-            FindJarMods = Directory.GetFiles(MinecraftModsPath, "*.jar");
+            string[] WhitelistExtensions = new[] { ".jar", ".disable" };
+            FindJarMods = Directory.GetFiles(MinecraftModsPath).Where(f => WhitelistExtensions.Any(f.ToLower().EndsWith)).ToArray();
             ModsAndHashesExists = new Dictionary<string, string>();
 
             if (File.Exists(AddonsCachePath))
@@ -61,7 +62,7 @@ namespace WPF_Minecraft_Launcher.Components
                     ModsAndHashesExists.Add(FileHash, FullFilePath);
                 }
 
-                Global.MainWindowUI.WriteTextToLogBox($"Start addons downloading");
+                Global.MainWindowUI?.WriteTextToLogBox($"Start addons downloading");
 
                 var GetAddonsReqeust = new LWebRequest();
                 GetAddonsReqeust.SetAddress(GetAddonsURL);
@@ -69,18 +70,22 @@ namespace WPF_Minecraft_Launcher.Components
                 string JsonAddonsResponse = GetAddonsReqeust.Send(HttpMethod.Get).ResponseText;
                 var AddonsResponse = JsonConvert.DeserializeObject<AddonModel>(JsonAddonsResponse);
 
-                if (AddonsResponse == null || AddonsResponse.response.Count == 0)
+                if (AddonsResponse == null)
+                    throw new Exception("Failed to convert model to addon object");
+
+                if (AddonsResponse.response.Count == 0)
                 {
-                    foreach(string FileHash in AddonsCacheHashesList)
+                    for(int i = AddonsCacheHashesList.Count - 1; i >= 0; i--)
                     {
+                        string FileHash = AddonsCacheHashesList[i];
                         string FilePath = ModsAndHashesExists.FirstOrDefault(x => x.Key == FileHash).Value;
                         if (FilePath != null)
                         {
                             if (File.Exists(FilePath))
                                 File.Delete(FilePath);
 
-                            AddonsCacheHashesList.RemoveAll(x => x == FileHash);
-                            Global.MainWindowUI.WriteTextToLogBox($"Remove addon - {Path.GetFileName(FilePath)}");
+                            AddonsCacheHashesList.RemoveAt(i);
+                            Global.MainWindowUI?.WriteTextToLogBox($"Remove addon - {Path.GetFileName(FilePath)}");
                         }
                     }
 
@@ -95,7 +100,6 @@ namespace WPF_Minecraft_Launcher.Components
                     if (!Directory.Exists(DownloadAddonsCachePath))
                         Directory.CreateDirectory(DownloadAddonsCachePath);
 
-                    Dictionary<string, string> AddonsToRemoveList = new Dictionary<string, string>();
                     TotalProgress = ModsAndHashesExists.Count;
 
                     foreach (KeyValuePair<string, string> entry in ModsAndHashesExists)
@@ -103,25 +107,14 @@ namespace WPF_Minecraft_Launcher.Components
                         string path = entry.Value;
                         string hash = entry.Key;
 
-                        if (!AddonsList.Exists(x => x.hash == hash))
-                            AddonsToRemoveList.Add(hash, path);
+                        if (AddonsCacheHashesList.Exists(x => x == hash) && !AddonsList.Exists(x => x.hash == hash))
+                        {
+                            if (File.Exists(path))
+                                File.Delete(path);
 
-                        RecalculateProgress(ref CurrentProgress, TotalProgress);
-                    }
-
-                    CurrentProgress = 0;
-                    TotalProgress = AddonsToRemoveList.Count;
-
-                    foreach (KeyValuePair<string, string> entry in AddonsToRemoveList)
-                    {
-                        string path = entry.Value;
-                        string hash = entry.Key;
-
-                        if (File.Exists(path))
-                            File.Delete(path);
-
-                        AddonsCacheHashesList.RemoveAll(x => x == hash);
-                        Global.MainWindowUI.WriteTextToLogBox($"Remove addon - {Path.GetFileName(path)}");
+                            AddonsCacheHashesList.RemoveAll(x => x == hash);
+                            Global.MainWindowUI?.WriteTextToLogBox($"Remove addon - {Path.GetFileName(path)}");
+                        }
 
                         RecalculateProgress(ref CurrentProgress, TotalProgress);
                     }
@@ -139,7 +132,7 @@ namespace WPF_Minecraft_Launcher.Components
                         if (IsExist && FoundExistingAddon != null)
                         {
                             ChangeAddonState(FoundExistingAddon, Addon.enabled);
-                            RecalculateProgress(ref CurrentProgress, TotalProgress);
+                            RecalculateProgress(ref CurrentProgress, TotalProgress, true);
                         }
                         else
                         {
@@ -158,11 +151,12 @@ namespace WPF_Minecraft_Launcher.Components
                                     if (!AddonsCacheHashesList.Exists(x => x == FileHash))
                                         AddonsCacheHashesList.Add(FileHash);
 
-                                    string DownloadedAddonFilePath = Path.Combine(MinecraftModsPath, Addon.name);
+                                    // Потом надо убрать mod-
+                                    string DownloadedAddonFilePath = Path.Combine(MinecraftModsPath, "mod-" + Addon.name);
                                     ChangeAddonState(DownloadedAddonFilePath, Addon.enabled);
 
-                                    Global.MainWindowUI.WriteTextToLogBox($"Add new addon - {Addon.name}");
-                                    RecalculateProgress(ref CurrentProgress, TotalProgress);
+                                    Global.MainWindowUI?.WriteTextToLogBox($"Add new addon - {Addon.name}");
+                                    RecalculateProgress(ref CurrentProgress, TotalProgress, true);
                                 });
 
                                 await client.DownloadFileTaskAsync(new Uri(Addon.link), DownloadZipFilePath);
@@ -173,7 +167,7 @@ namespace WPF_Minecraft_Launcher.Components
             }
             catch (Exception ex)
             {
-                Global.LauncherLogger.Write(ex.ToString(), "ERROR");
+                Global.LauncherLogger?.Write(ex.ToString(), "ERROR");
                 return;
             }
         }
@@ -182,21 +176,33 @@ namespace WPF_Minecraft_Launcher.Components
         {
             if (File.Exists(FilePath))
             {
-                if (Enabled && Path.GetExtension(FilePath) == ".disable")
-                    Path.ChangeExtension(FilePath, ".jar");
-                else if (!Enabled && Path.GetExtension(FilePath) == ".jar")
-                    Path.ChangeExtension(FilePath, ".disable");
+                string CurrentExtension = Path.GetExtension(FilePath);
+                string NewExtensionFilePath = "";
+
+                if (Enabled && CurrentExtension == ".disable")
+                {
+                    NewExtensionFilePath = Path.ChangeExtension(FilePath, ".jar");
+                    Global.MainWindowUI?.WriteTextToLogBox($"Enable addon - {Path.GetFileName(FilePath)}");
+                }
+                else if (!Enabled && CurrentExtension == ".jar")
+                {
+                    NewExtensionFilePath = Path.ChangeExtension(FilePath, ".disable");
+                    Global.MainWindowUI?.WriteTextToLogBox($"Disable addon - {Path.GetFileName(FilePath)}");
+                }
+
+                if (NewExtensionFilePath.Length != 0)
+                    File.Move(FilePath, NewExtensionFilePath);
             }
         }
 
-        private void RecalculateProgress(ref int CurrentProgress, int TotalProgress)
+        private void RecalculateProgress(ref int CurrentProgress, int TotalProgress, bool IsFinal = false)
         {
             CurrentProgress++;
 
             int result = (CurrentProgress / TotalProgress) * 100;
             DownloadVersion_DownloadProgressChanged(this, new ProgressChangedEventArgs(result, null));
 
-            if (CurrentProgress == TotalProgress)
+            if (IsFinal && CurrentProgress == TotalProgress)
                 Complete();
         }
 
@@ -213,7 +219,7 @@ namespace WPF_Minecraft_Launcher.Components
             }
             catch { }
 
-            Global.MainWindowUI.WriteTextToLogBox($"Downloading addons completed");
+            Global.MainWindowUI?.WriteTextToLogBox($"Downloading addons completed");
             DownloadCompleted?.Invoke();
         }
         private void UnzipProgressEvent(object sender, int e)
