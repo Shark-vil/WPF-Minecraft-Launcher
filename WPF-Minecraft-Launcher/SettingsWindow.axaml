@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="250"
+        x:Class="WPF_Minecraft_Launcher.SettingsWindow"
+        WindowStartupLocation="CenterScreen"
+        Background="#383636"
+        Title="Launcher - Settings">
+  <Grid x:Name="Grid_Container" Margin="10" ShowGridLines="True">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="10" />
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="10" />
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="10"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="10"/>
+    </Grid.RowDefinitions>
+
+    <Grid Background="#454242" Grid.Row="1" Grid.Column="1">
+      <StackPanel>
+        <DockPanel>
+          <TextBlock Text="Max RAM - " Foreground="White" Margin="20, 20, 0, 0"/>
+          <TextBox Text="{Binding MaxRAM}" Width="100" HorizontalAlignment="Left" Margin="0, 10, 0, 0"/>
+        </DockPanel>
+        <Slider Minimum="0" Background="#cccccc" Maximum="16384" Margin="20, 0, 20, 0" Value="{Binding MaxRAM}"/>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</Window>

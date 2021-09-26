@@ -6,118 +6,152 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
+using WPF_Minecraft_Launcher.Components;
 
 namespace WPF_Minecraft_Launcher.Models
 {
     public class MainWindowModel : INotifyPropertyChanged
     {
-        private string _username = "";
-        private string _password = "";
-        private string _logs = "";
-        private int _fileChangedMin = 0;
-        private int _fileChangedMax = 100;
-        private int _fileChangedValue = 0;
-        private bool _fileIsLoop = false;
-        private int _progressChangedMin = 0;
-        private int _progressChangedMax = 100;
-        private int _progressChangedValue = 0;
+        private string _UserName = "";
+        private string _UserPassword = "";
+        private string _Logs = "";
+        private string _StartButtonText = "Запуск";
+        private int _FileChangeMinimum = 0;
+        private int _FileChangeMaximum = 100;
+        private int _FileChangeValue = 0;
+        private string _FileChangeText = "";
+        private int _ProgressChangeMinimum = 0;
+        private int _ProgressChangeMaximum = 100;
+        private int _ProgressChangeValue = 0;
+        private string _ProgressChangeText = "";
+        private string _Version = Global.LauncherVersion;
 
-        internal string username
+        internal string UserName
         {
-            get { return _username; }
+            get { return _UserName; }
             set
             { 
-                _username = value;
+                _UserName = value;
                 OnPropertyChanged();
             }
         }
 
-        internal string password
+        internal string UserPassword
         {
-            get { return _password; }
+            get { return _UserPassword; }
             set
             {
-                _password = value;
+                _UserPassword = value;
                 OnPropertyChanged();
             }
         }
 
-        internal string logs
+        internal string StartButtonText
         {
-            get { return _logs; }
+            get { return _StartButtonText; }
             set
             {
-                _logs = value;
+                _StartButtonText = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int fileChangedMin
+        internal string Logs
         {
-            get { return _fileChangedMin; }
+            get { return _Logs; }
             set
             {
-                _fileChangedMin = value;
+                _Logs = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int fileChangedMax
+        internal int FileChangeMinimum
         {
-            get { return _fileChangedMax; }
+            get { return _FileChangeMinimum; }
             set
             {
-                _fileChangedMax = value;
+                _FileChangeMinimum = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int fileChangedValue
+        internal int FileChangeMaximum
         {
-            get { return _fileChangedValue; }
+            get { return _FileChangeMaximum; }
             set
             {
-                _fileChangedValue = value;
+                _FileChangeMaximum = value;
                 OnPropertyChanged();
             }
         }
 
-        internal bool fileIsLoop
+        internal int FileChangeValue
         {
-            get { return _fileIsLoop; }
+            get { return _FileChangeValue; }
             set
             {
-                _fileIsLoop = value;
+                _FileChangeValue = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int progressChangedMin
+        internal string FileChangeText
         {
-            get { return _progressChangedMin; }
+            get { return _FileChangeText; }
             set
             {
-                _progressChangedMin = value;
+                _FileChangeText = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int progressChangedMax
+        internal int ProgressChangeMinimum
         {
-            get { return _progressChangedMax; }
+            get { return _ProgressChangeMinimum; }
             set
             {
-                _progressChangedMax = value;
+                _ProgressChangeMinimum = value;
                 OnPropertyChanged();
             }
         }
 
-        internal int progressChangedValue
+        internal int ProgressChangeMaximum
         {
-            get { return _progressChangedValue; }
+            get { return _ProgressChangeMaximum; }
             set
             {
-                _progressChangedValue = value;
+                _ProgressChangeMaximum = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal int ProgressChangeValue
+        {
+            get { return _ProgressChangeValue; }
+            set
+            {
+                _ProgressChangeValue = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal string ProgressChangeText
+        {
+            get { return _ProgressChangeText; }
+            set
+            {
+                _ProgressChangeText = value;
+                OnPropertyChanged();
+            }
+        }
+
+        internal string Version
+        {
+            get { return _Version; }
+            set
+            {
+                _Version = value;
                 OnPropertyChanged();
             }
         }

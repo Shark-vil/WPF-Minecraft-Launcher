@@ -1,14 +1,9 @@
 ﻿using Avalonia.Threading;
 using CmlLib.Core;
 using CmlLib.Core.Auth;
-using CmlLib.Core.Downloader;
-using CmlLib.Core.Version;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using WPF_Minecraft_Launcher.Models;
@@ -17,56 +12,134 @@ namespace WPF_Minecraft_Launcher.Components
 {
     public class GameStarter
     {
-        private MainWindow window;
-        private MainWindowModel content;
-        private Thread gameThread;
-        private Thread processCheckerThread;
-        private MSession userMinecraftSession;
-        private MinecraftPath minecraftPath;
-        internal static GameModel gameModel = new GameModel();
+        private MainWindow MainWindowUI;
+        private MainWindowModel MainWindowContext;
+        private Thread? GameThread;
+        private MSession? MinecraftUserSession;
+        private MinecraftPath? GameDirectoryPath;
+        private Profile UserProfile;
+        private MLauncherLogin MinecraftLauncherAuthorizer = new MLauncherLogin();
+        internal static GameModel GameProcessObject = new GameModel();
 
-        public GameStarter(MainWindow window)
+        public GameStarter(MainWindow window, Profile profile)
         {
-            this.window = window;
-            this.content = window.content;
+            this.UserProfile = profile;
+            this.MainWindowUI = window;
+            this.MainWindowContext = window.Context;
         }
 
         internal void Launch()
         {
-            content.fileChangedValue = 0;
-            content.progressChangedValue = 0;
+            MLoginResponse Response = MinecraftLauncherAuthorizer.TryAutoLogin();
+            if (Response.Result != MLoginResult.Success)
+            {
+                if (UserProfile.UserName.Length != 0 && UserProfile.UserPassword.Length != 0)
+                    Launch(UserProfile.UserName, UserProfile.UserPassword);
+                else
+                    Global.MainWindowUI?.SwitchActiveUI(true);
+            }
+            else
+                Launch(Response);
+        }
 
-            userMinecraftSession = MSession.GetOfflineSession(content.username);
-            minecraftPath = new MinecraftPath(Global.LauncherConfig.MinecraftPath);
+        internal void Launch(string username, string password)
+        {
+            MLoginResponse Response = MinecraftLauncherAuthorizer.Authenticate(username, password);
+            Launch(Response);
+        }
 
-            window.switchUiActive(false);
+        internal void Launch(MLoginResponse Response)
+        {
+            MainWindowContext.FileChangeValue = 0;
+            MainWindowContext.ProgressChangeValue = 0;
 
-            gameThread = new Thread(OnLaunchMinecraft);
-            gameThread.IsBackground = true;
-            gameThread.Priority = ThreadPriority.Highest;
-            gameThread.Start();
+            //userMinecraftSession = MSession.GetOfflineSession(content.username);
 
-            gameModel.minecraftPath = minecraftPath;
-            gameModel.session = userMinecraftSession;
-            gameModel.starterThread = gameThread;
+            if (Response.IsSuccess)
+            {
+                MinecraftUserSession = Response.Session;
+                UserProfile.AccessToken = Response.Session.AccessToken;
+
+                GameDirectoryPath = new MinecraftPath(Global.MinecraftPath);
+
+                GameThread = new Thread(OnLaunchMinecraft);
+                GameThread.IsBackground = true;
+                GameThread.Priority = ThreadPriority.Normal;
+                GameThread.Start();
+
+                GameProcessObject.minecraftPath = GameDirectoryPath;
+                GameProcessObject.session = MinecraftUserSession;
+                GameProcessObject.starterThread = GameThread;
+            }
+            else
+                Global.MainWindowUI?.SwitchActiveUI(true);
         }
 
         private void OnLaunchMinecraft()
         {
-            var launchOption = new MLaunchOption
+            var JavaDownloaderService = new JavaRuntimeDownloader();
+            var AddonsDownloaderService = new AddonsDownloader();
+
+            JavaDownloaderService.ProgressChanged += (s, e) =>
             {
-                MaximumRamMb = 1024,
-                Session = userMinecraftSession,
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
+            };
+            JavaDownloaderService.DownloadCompleted = (string JavaRuntimeDirectoryPath) => Launcher_Start(JavaRuntimeDirectoryPath);
+
+            AddonsDownloaderService.ProgressChanged += (s, e) =>
+            {
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
+            };
+            AddonsDownloaderService.DownloadCompleted = () => JavaDownloaderService.CheckJava();
+
+            AddonsDownloaderService.Download();
+        }
+
+        private void Launcher_Start(string javapath)
+        {
+            MinecraftVersionModel? Version = MinecraftVersion.GetVersion();
+            if (Version == null)
+            {
+                MainWindowUI.WriteTextToLogBox("Failed to get the latest version.");
+                MainWindowUI.SwitchActiveUI(true);
+                return;
+            }
+
+            string InjectorFilePath = Path.Combine(Global.MinecraftPath, "authlib.jar");
+            if (!File.Exists(InjectorFilePath))
+                File.WriteAllBytes(InjectorFilePath, Properties.Resources.authlib);
+
+            int MinimumRAM = 2048;
+            int MaximumRAM = Global.LauncherConfig.MaxRAM < MinimumRAM ? MinimumRAM : Global.LauncherConfig.MaxRAM;
+
+            var MinecraftOptions = new MLaunchOption
+            {
+                Session = MinecraftUserSession,
                 GameLauncherName = "Minecraft-Client-Pipbuck",
                 VersionType = "Minecraft-Client-Pipbuck",
                 GameLauncherVersion = "1.0.0",
-                ServerIp = "95.216.122.173",
-                ServerPort = 25565,
+                JavaPath = javapath,
+                JVMArguments = new string[]
+                {
+                    $"-javaagent:\"{InjectorFilePath}=" + Global.LauncherConfig.AuthserverAddress + "\"",
+                    "-Dauthlibinjector.debug",
+                    "-Dauthlibinjector.noLogFile",
+                    $"-Xms{MinimumRAM}m",
+                    $"-Xmx{MaximumRAM}m"
+                },
+                ServerIp = (Global.LauncherConfig.ServerIP.Length != 0) ? Global.LauncherConfig.ServerIP : null,
+                ServerPort = Global.LauncherConfig.ServerPort,
             };
 
-            var launcher = new CMLauncher(minecraftPath);
+            var LauncherService = new CMLauncher(GameDirectoryPath);
 
-            launcher.FileChanged += (e) =>
+            LauncherService.FileChanged += (e) =>
             {
                 string FileKind = e.FileKind.ToString();
                 string FileName = e.FileName;
@@ -74,109 +147,108 @@ namespace WPF_Minecraft_Launcher.Components
                 int TotalFileCount = e.TotalFileCount;
                 string text = string.Format("[{0}] {1} - {2}/{3}", FileKind, FileName, ProgressedFileCount, TotalFileCount);
 
-                content.fileChangedMin = 0;
-                content.fileChangedMax = TotalFileCount;
-                content.fileChangedValue = ProgressedFileCount;
+                MainWindowContext.FileChangeMinimum = 0;
+                MainWindowContext.FileChangeMaximum = TotalFileCount;
+                MainWindowContext.FileChangeValue = ProgressedFileCount;
 
                 if (FileKind.ToLower() != "resource" || FileName.Length != 0)
-                    window.AddLineToLog(text);
+                    MainWindowUI.WriteTextToLogBox(text);
 
                 if (ProgressedFileCount == TotalFileCount)
-                    window.AddLineToLog(text);
+                    MainWindowUI.WriteTextToLogBox(text);
+
+                MainWindowContext.FileChangeText = text;
             };
 
-            launcher.ProgressChanged += (s, e) =>
+            LauncherService.ProgressChanged += (s, e) =>
             {
-                content.progressChangedMin = 0;
-                content.progressChangedMax = 100;
-                content.progressChangedValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeMinimum = 0;
+                MainWindowContext.ProgressChangeMaximum = 100;
+                MainWindowContext.ProgressChangeValue = e.ProgressPercentage;
+                MainWindowContext.ProgressChangeText = $"{MainWindowContext.ProgressChangeValue}/{MainWindowContext.ProgressChangeMaximum}%";
             };
 
-            launcher.LogOutput += (s, e) => window.AddLineToLog(e);
+            LauncherService.LogOutput += (s, e) => Global.LauncherLogger?.Write(e);
 
-            var process = launcher.CreateProcess(Global.LauncherConfig.MinecraftVersion, launchOption);
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.ErrorDialog = true;
-            process.ErrorDataReceived += Process_ErrorDataReceived;
-            process.OutputDataReceived += Process_OutputDataReceived;
-            gameModel.gameProcess = process;
+            Process GameProcess;
 
-            window.AddLineToLog("Starting the game process.");
+            string ActualMinecraftVersion = Version.response.minecraft_version;
+            string ActualForgeVersion = Version.response.forge_version;
 
-            Logger.Write(process.StartInfo.Arguments, "PARAMS");
-
-            if (process.Start())
+            if (ActualMinecraftVersion.Length != 0)
             {
-                process.BeginErrorReadLine();
-                process.BeginOutputReadLine();
+                MainWindowUI.WriteTextToLogBox("The launcher will download the required packages, please wait.");
 
-                window.processName = process.ProcessName;
+                if (ActualForgeVersion.Length != 0)
+                    GameProcess = LauncherService.CreateProcess(ActualMinecraftVersion, ActualForgeVersion, MinecraftOptions);
+                else
+                    GameProcess = LauncherService.CreateProcess(ActualMinecraftVersion, MinecraftOptions);
 
-                processCheckerThread = new Thread(ProcessChecker);
-                processCheckerThread.IsBackground = true;
-                processCheckerThread.Priority = ThreadPriority.Lowest;
-                processCheckerThread.Start();
-
-                window.AddLineToLog("The game watcher process has started.");
-
-                Dispatcher.UIThread.InvokeAsync(() => window.Hide());
+                Process_Start(GameProcess);
             }
             else
             {
-                window.AddLineToLog("Error! Failed to start the game! Please check the file - pipbuck-launcher.log");
-                window.switchUiActive(true);
+                MainWindowUI.WriteTextToLogBox("Error. Invalid version information, empty string.");
+                MainWindowUI.SwitchActiveUI(true);
             }
-
-            window.resetProgress();
         }
 
-        private void ProcessChecker()
+        private void Process_Start(Process GameProcess)
         {
-            bool isLaunched = false;
+            GameProcess.StartInfo.UseShellExecute = false;
+            GameProcess.StartInfo.RedirectStandardOutput = true;
+            GameProcess.StartInfo.RedirectStandardError = true;
+            GameProcess.StartInfo.ErrorDialog = true;
+            GameProcess.EnableRaisingEvents = true;
+            GameProcess.ErrorDataReceived += Process_ErrorDataReceived;
+            GameProcess.OutputDataReceived += Process_OutputDataReceived;
+            GameProcess.Exited += Process_Exited;
+            GameProcessObject.gameProcess = GameProcess;
 
-            while (true)
+            MainWindowUI.WriteTextToLogBox("Starting the game process.");
+
+            Global.LauncherLogger?.Write(GameProcess.StartInfo.Arguments, "PARAMS");
+
+            if (GameProcess.Start())
             {
-                int ProcessLength = Process.GetProcessesByName(window.processName).Length;
+                GameProcess.BeginErrorReadLine();
+                GameProcess.BeginOutputReadLine();
 
-                if (isLaunched)
-                {
-                    if (ProcessLength == 0)
-                    {
-                        window.gameCLosed();
-                        break;
-                    }
-                }
-                else if (ProcessLength > 0)
-                    isLaunched = true;
+                MainWindowUI.MinecraftProcessName = GameProcess.ProcessName;
 
-                Task.Delay(1000);
+#if (!DEBUG)
+                Dispatcher.UIThread.InvokeAsync(() => MainWindowUI.Hide());
+#endif
             }
+            else
+            {
+                MainWindowUI.WriteTextToLogBox("Error! Failed to start the game! Please check the file - pipbuck-launcher.log");
+                MainWindowUI.SwitchActiveUI(true);
+            }
+
+            MainWindowUI.ResetAllProgressBars();
         }
+
+        private void Process_Exited(object? sender, EventArgs e) => MainWindowUI.CloseMinecraftProcess();
 
         private void Process_OutputDataReceived(object sender, DataReceivedEventArgs e)
         {
-            string? data = e.Data?.ToString();
+            string? GameLog = e.Data?.ToString();
 
-            if (data == null)
+            if (GameLog == null)
                 return;
 
-            window.AddLineToLog("System message added to - pipbuck-launcher.log");
-
-            Logger.Write(data);
+            Global.GameLogger?.Write(GameLog);
         }
 
         private void Process_ErrorDataReceived(object sender, DataReceivedEventArgs e)
         {
-            string? data = e.Data?.ToString();
+            string? GameErrorLog = e.Data?.ToString();
 
-            if (data == null)
+            if (GameErrorLog == null)
                 return;
 
-            window.AddLineToLog("An unexpected error has occurred, check the file - pipbuck-launcher.log");
-
-            Logger.Write(data, "ERROR");
+            Global.GameErrorsLogger?.Write(GameErrorLog, "ERROR");
         }
     }
 }
